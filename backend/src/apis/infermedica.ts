@@ -3,7 +3,7 @@ import axios from "axios"
 
 const router = express.Router()
 
-router.post("/diagnosis", async (req, res) => {
+router.post("/parse", async (req, res) => {
   try {
     const infermedicaUrl = "https://api.infermedica.com/v3/parse"
     const response = await axios.post(

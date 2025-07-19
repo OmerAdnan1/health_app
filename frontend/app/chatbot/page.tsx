@@ -160,11 +160,11 @@ export default function ChatbotPage() {
 
       // If last question, send to API
       if (currentStep === questions.length - 1) {
-        getDiagnosis({ responses: responseString }).then((result) => {
+        getParseResult(responseString).then((result) => {
           setDiagnosisResult(JSON.stringify(result, null, 2))
-          console.log("Diagnosis result from API:", result) // <-- Print diagnosis result to console
+          console.log("Parse result from API:", result)
         })
-      }
+}
 
       return updated
     })
@@ -264,6 +264,38 @@ const getDiagnosis = async (payload: Record<string, any>) => {
   return await res.json()
 }
 
+const getParseResult = async (responseString: string) => {
+  const payload = {
+    age: { value: 30, unit: "year" }, // You can get these from user input
+    sex: "male", // Or from user input
+    text: responseString,
+    context: [],
+    include_tokens: true,
+    correct_spelling: true,
+    concept_types: ["symptom"],
+  }
+  const res = await fetch("http://localhost:5000/api/infermedica/parse", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+  return await res.json()
+}
+
+const handleParseResult = (result: any) => {
+  // Extract mentions array
+  const mentions = result.mentions || [];
+  // Get the first mention (if exists)
+  const firstMention = mentions[0] || {};
+  // Extract specific fields
+  const symptomName = firstMention.common_name || "";
+  const symptomType = firstMention.type || "";
+  const symptomId = firstMention.id || "";
+  // Extract tokens
+  const tokens = result.tokens || [];
+  // Extract obvious flag
+  const isObvious = result.obvious || false;
+}
 
 
   return (

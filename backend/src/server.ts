@@ -11,11 +11,13 @@ import cors from 'cors';
 // import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
-const port = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors()); // Enable CORS for all routes (adjust for production if needed)
-app.use(express.json()); // Enable parsing JSON request bodies
+app.use(cors()); // <-- Enable CORS for all routes FIRST
+app.use(express.json()); // <-- Enable parsing JSON request bodies
+
+import infermedicaRoutes from "./apis/infermedica";
+app.use("/api/infermedica", infermedicaRoutes); // <-- Register routes AFTER middleware
 
 // Infermedica API Credentials from environment variables
 const INFERMEDICA_APP_ID = process.env.INFERMEDICA_APP_ID;
@@ -172,6 +174,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 // Start the server
+const port = process.env.PORT || 5000;
 app.listen(port, () => {
     console.log(`Infermedica Backend API listening at http://localhost:${port}`);
     // Check if App ID is loaded correctly for debugging
