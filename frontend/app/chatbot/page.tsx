@@ -5,16 +5,24 @@ import Header from "../../components/Header"
 import Footer from "../../components/Footer"
 import { Send, Bot, User, Lightbulb, CheckCircle, Mic, MicOff, Volume2, VolumeX } from "lucide-react"
 
+type Message = {
+  id: number
+  content: string
+  sender: "bot" | "user"
+  timestamp: Date
+}
+
 export default function ChatbotPage() {
   const router = useRouter()
-  const [messages, setMessages] = useState([])
-  const [currentInput, setCurrentInput] = useState("")
-  const [currentStep, setCurrentStep] = useState(0)
-  const [isTyping, setIsTyping] = useState(false)
-  const [responses, setResponses] = useState({})
-  const [isListening, setIsListening] = useState(false)
-  const [isSpeaking, setIsSpeaking] = useState(false)
-  const messagesEndRef = useRef(null)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [currentInput, setCurrentInput] = useState<string>("")
+  const [currentStep, setCurrentStep] = useState<number>(0)
+  const [isTyping, setIsTyping] = useState<boolean>(false)
+  const [responses, setResponses] = useState<Record<string, string>>({})
+  const [isListening, setIsListening] = useState<boolean>(false)
+  const [isSpeaking, setIsSpeaking] = useState<boolean>(false)
+  const [diagnosisResult, setDiagnosisResult] = useState<string | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const questions = [
     {
@@ -102,13 +110,15 @@ export default function ChatbotPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  const addBotMessage = (content) => {
+  const generateUniqueId = () => Date.now() + Math.random()
+
+  const addBotMessage = (content: string) => {
     setIsTyping(true)
     setTimeout(() => {
       setMessages((prev) => [
         ...prev,
         {
-          id: Date.now(),
+          id: generateUniqueId(),
           content,
           sender: "bot",
           timestamp: new Date(),
@@ -118,11 +128,11 @@ export default function ChatbotPage() {
     }, 1000)
   }
 
-  const addUserMessage = (content) => {
+  const addUserMessage = (content: string) => {
     setMessages((prev) => [
       ...prev,
       {
-        id: Date.now(),
+        id: generateUniqueId(),
         content,
         sender: "user",
         timestamp: new Date(),
@@ -130,38 +140,53 @@ export default function ChatbotPage() {
     ])
   }
 
-  const handleSendMessage = () => {
-    if (!currentInput.trim()) return
+  const handleSendMessage = async (input?: string) => {
+    const value = input !== undefined ? input : currentInput
+    if (!value.trim()) return
 
     const currentQuestion = questions[currentStep]
-    addUserMessage(currentInput)
+    addUserMessage(value)
 
-    // Store response
-    setResponses((prev) => ({
-      ...prev,
-      [currentQuestion.id]: currentInput,
-    }))
+    setResponses((prev) => {
+      const updated = {
+        ...prev,
+        [currentQuestion.id]: value,
+      }
+      const responseValues = Object.values(updated)
+      // Exclude 2nd and 3rd responses (index 1 and 2)
+      const filteredResponses = responseValues.filter((_, idx) => idx !== 1 && idx !== 2)
+      const responseString = filteredResponses.join(" . ")
+      console.log("Responses excluding 2nd and 3rd:", responseString)
+
+      // If last question, send to API
+      if (currentStep === questions.length - 1) {
+        getDiagnosis({ responses: responseString }).then((result) => {
+          setDiagnosisResult(JSON.stringify(result, null, 2))
+          console.log("Diagnosis result from API:", result) // <-- Print diagnosis result to console
+        })
+      }
+
+      return updated
+    })
 
     setCurrentInput("")
 
-    // Move to next question or finish
     if (currentStep < questions.length - 1) {
+      const nextStep = currentStep + 1
+      setCurrentStep(nextStep)
       setTimeout(() => {
-        setCurrentStep((prev) => prev + 1)
-        addBotMessage(questions[currentStep + 1].question)
+        addBotMessage(questions[nextStep].question)
       }, 1500)
     } else {
-      // Finish assessment
       setTimeout(() => {
         addBotMessage(
           "Thank you for providing all the information! I'm now analyzing your symptoms and preparing your personalized health report...",
         )
         setTimeout(() => {
-          // Store responses in localStorage for results page
           localStorage.setItem(
             "healthAssessment",
             JSON.stringify({
-              responses: { ...responses, [currentQuestion.id]: currentInput },
+              responses: { ...responses, [currentQuestion.id]: value },
               timestamp: new Date().toISOString(),
             }),
           )
@@ -171,19 +196,18 @@ export default function ChatbotPage() {
     }
   }
 
-  const handleOptionSelect = (option) => {
-    setCurrentInput(option)
-    setTimeout(() => handleSendMessage(), 100)
+  // Update your option and scale handlers:
+  const handleOptionSelect = (option: string) => {
+    handleSendMessage(option)
   }
 
-  const handleScaleSelect = (value) => {
-    setCurrentInput(value.toString())
-    setTimeout(() => handleSendMessage(), 100)
+  const handleScaleSelect = (value: number) => {
+    handleSendMessage(value.toString())
   }
 
   const startListening = () => {
     if ("webkitSpeechRecognition" in window) {
-      const recognition = new window.webkitSpeechRecognition()
+      const recognition = new (window as any).webkitSpeechRecognition()
       recognition.continuous = false
       recognition.interimResults = false
       recognition.lang = "en-US"
@@ -192,7 +216,7 @@ export default function ChatbotPage() {
         setIsListening(true)
       }
 
-      recognition.onresult = (event) => {
+      recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript
         setCurrentInput(transcript)
         setIsListening(false)
@@ -210,7 +234,7 @@ export default function ChatbotPage() {
     }
   }
 
-  const speakMessage = (text) => {
+  const speakMessage = (text: string) => {
     if ("speechSynthesis" in window) {
       const utterance = new SpeechSynthesisUtterance(text)
       utterance.onstart = () => setIsSpeaking(true)
@@ -228,6 +252,19 @@ export default function ChatbotPage() {
 
   const currentQuestion = questions[currentStep]
   const progress = ((currentStep + 1) / questions.length) * 100
+
+  
+  // Example fetch from frontend
+const getDiagnosis = async (payload: Record<string, any>) => {
+  const res = await fetch("/api/infermedica/diagnosis", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+  return await res.json()
+}
+
+
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col transition-colors">
@@ -354,7 +391,7 @@ export default function ChatbotPage() {
                         type="text"
                         value={currentInput}
                         onChange={(e) => setCurrentInput(e.target.value)}
-                        onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+                        onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
                         placeholder="Type your response..."
                         className="w-full px-6 py-4 border border-gray-300 dark:border-gray-600 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white transition-colors"
                       />
@@ -371,7 +408,7 @@ export default function ChatbotPage() {
                       </button>
                     </div>
                     <button
-                      onClick={handleSendMessage}
+                      onClick={() => handleSendMessage()}
                       disabled={!currentInput.trim()}
                       className="px-8 py-4 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-2xl hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:scale-105 disabled:hover:scale-100"
                     >
@@ -382,7 +419,7 @@ export default function ChatbotPage() {
 
                 {currentQuestion?.type === "select" && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {currentQuestion.options.map((option, index) => (
+                    {currentQuestion.options?.map((option, index) => (
                       <button
                         key={index}
                         onClick={() => handleOptionSelect(option)}
