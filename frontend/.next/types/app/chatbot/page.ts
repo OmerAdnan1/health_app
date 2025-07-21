@@ -1,4 +1,4 @@
-// File: /home/omeradnan/Desktop/programming/health_app/health_app/frontend/app/chatbot/page.tsx
+// File: C:\Users\ssaad\Documents\GitHub\health_app\frontend\app\chatbot\page.tsx
 import * as entry from '../../../../app/chatbot/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
