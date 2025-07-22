@@ -87,7 +87,8 @@ export default function ChatbotPage() {
   const [currDiagnosisConditions, setCurrDiagnosisConditions] = useState<any[]>([])
   const [isDiagnosisComplete, setIsDiagnosisComplete] = useState<boolean>(false)
   const [tempGroupedSelections, setTempGroupedSelections] = useState<Record<string, "present" | "absent" | "unknown">>({});
-
+  const MAX_DIAGNOSIS_QUESTIONS = 8;
+  const [diagnosisQuestionCount, setDiagnosisQuestionCount] = useState(0);
 
   // Initial fixed questions for the bot
   const questions: InitialQuestion[] = [
@@ -164,7 +165,7 @@ export default function ChatbotPage() {
         },
       ])
       setIsTyping(false)
-    }, 1000) // Simulate typing delay
+    }, 100) // Simulate typing delay
   }
 
   // Add user message
@@ -183,38 +184,54 @@ export default function ChatbotPage() {
     // Handles confirmation for grouped_multiple questions
   const handleGroupedMultipleConfirm = async () => {
     setIsTyping(true);
-    addUserMessage("Confirmed selections."); // Acknowledge user's confirmation
+    addUserMessage("Confirmed selections.");
 
-    // Construct new evidence from tempGroupedSelections
     const newEvidenceToAdd: EvidenceItem[] = Object.entries(tempGroupedSelections).map(([id, choice_id]) => ({
-      id,
-      choice_id,
+        id,
+        choice_id,
     }));
 
-    // Clear temporary selections
     setTempGroupedSelections({});
 
-    // Update the main evidence state and then call diagnosis
     setEvidence((prevEvidence) => {
-        // Filter out any existing evidence for these items before adding new ones
         const filteredPrevEvidence = prevEvidence.filter(item => !newEvidenceToAdd.some(newItem => newItem.id === item.id));
         const combinedEvidence = [...filteredPrevEvidence, ...newEvidenceToAdd];
 
-        // Call diagnosis with the combined evidence
         setTimeout(async () => {
             try {
-                const nextDiagnosisResult = await getDiagnosis(combinedEvidence);
-                if (!nextDiagnosisResult) {
-                    throw new Error("No further diagnosis data received from the API. The server might be busy or experienced an error.");
-                }
-                if (nextDiagnosisResult.should_stop === false && !nextDiagnosisResult.question) {
-                    throw new Error("Diagnosis flow encountered an unexpected state: Expected a question but none was provided.");
+                // FINAL VERDICT LOGIC
+                if (diagnosisQuestionCount + 1 >= MAX_DIAGNOSIS_QUESTIONS) {
+                    const finalDiagnosisResult = await getDiagnosis(combinedEvidence);
+                    setDiagnosisResult(JSON.stringify(finalDiagnosisResult, null, 2));
+                    setCurrDiagnosisConditions(finalDiagnosisResult.conditions || []);
+                    setIsDiagnosisComplete(true);
+                    setCurrDiagnosisQuestions(null);
+                    setDiagnosisQuestionCount(prev => prev + 1);
+
+                    if (finalDiagnosisResult.conditions && finalDiagnosisResult.conditions.length > 0) {
+                        const topCondition = finalDiagnosisResult.conditions.reduce(
+                            (max: { probability: number }, cond: { probability: number }) =>
+                                cond.probability > max.probability ? cond : max,
+                            finalDiagnosisResult.conditions[0]
+                        );
+                        addBotMessage(
+                            `Final verdict: ${topCondition.name}\n\n` +
+                            "\nPlease consult a healthcare professional for confirmation and treatment."
+                        );
+                    } else {
+                        addBotMessage("No significant condition detected. Please consult a healthcare professional.");
+                    }
+                    setIsTyping(false);
+                    return;
                 }
 
+                // Normal diagnosis flow
+                const nextDiagnosisResult = await getDiagnosis(combinedEvidence);
                 setDiagnosisResult(JSON.stringify(nextDiagnosisResult, null, 2));
                 setCurrDiagnosisConditions(nextDiagnosisResult.conditions || []);
                 setIsDiagnosisComplete(nextDiagnosisResult.should_stop);
                 setCurrDiagnosisQuestions(nextDiagnosisResult.question || null);
+                setDiagnosisQuestionCount(prev => prev + 1);
 
                 setIsTyping(false);
                 if (nextDiagnosisResult.should_stop) {
@@ -230,8 +247,8 @@ export default function ChatbotPage() {
                 addBotMessage(`An error occurred: ${errorMessage}. Please try again.`);
                 setIsTyping(false);
             }
-        }, 1000); // Simulate processing time
-        return combinedEvidence; // Return the new state
+        }, 1000);
+        return combinedEvidence;
     });
   };
 
@@ -358,52 +375,56 @@ export default function ChatbotPage() {
     // This block runs when we are past the initial fixed questions AND
     // there's an active diagnosis question from Infermedica AND it's not complete yet.
     if (currDiagnosisQuestions && !isDiagnosisComplete) {
-        // For Infermedica choice buttons, the interaction is the answer, no need for addUserMessage
         const parts = value.split(':');
-
         if (parts.length === 2) {
             const itemId = parts[0];
             const choiceId = parts[1] as "present" | "absent" | "unknown";
-
-            // Basic validation for choiceId
             if (!["present", "absent", "unknown"].includes(choiceId)) {
                 addBotMessage("Invalid answer. Please select one of the provided options.");
                 return;
             }
 
-            // Fix 1: Differentiate between question types
-            // If it's a grouped_multiple, only update local state, don't call API here.
-            if (currDiagnosisQuestions.type === 'grouped_multiple') {
-                // Update temporary selections for grouped_multiple questions
-                setTempGroupedSelections((prev) => ({
-                    ...prev,
-                    [itemId]: choiceId,
-                }));
-                return; // Exit early, no API call here
-            }
-
-            // For single or grouped_single questions, proceed with immediate API call
-            // Fix 2: Move API call logic outside of setEvidence functional update
+            // For single/grouped_single questions, proceed with immediate API call
             const newEvidence = [...evidence.filter(item => item.id !== itemId), { id: itemId, choice_id: choiceId }];
-            setEvidence(newEvidence); // Update state
+            setEvidence(newEvidence);
 
             setIsTyping(true);
             setTimeout(async () => {
                 try {
-                    const nextDiagnosisResult = await getDiagnosis(newEvidence); // Pass newEvidence here
-                    if (!nextDiagnosisResult) {
-                        throw new Error("No further diagnosis data received from the API. The server might be busy or experienced an error.");
-                    }
-                    if (nextDiagnosisResult.should_stop === false && !nextDiagnosisResult.question) {
-                        throw new Error("Diagnosis flow encountered an unexpected state: Expected a question but none was provided.");
+                    // FINAL VERDICT LOGIC
+                    if (diagnosisQuestionCount + 1 >= MAX_DIAGNOSIS_QUESTIONS) {
+                        const finalDiagnosisResult = await getDiagnosis(newEvidence);
+                        setDiagnosisResult(JSON.stringify(finalDiagnosisResult, null, 2));
+                        setCurrDiagnosisConditions(finalDiagnosisResult.conditions || []);
+                        setIsDiagnosisComplete(true);
+                        setCurrDiagnosisQuestions(null);
+                        setDiagnosisQuestionCount(prev => prev + 1);
+
+                        // Find the condition with highest probability
+                        if (finalDiagnosisResult.conditions && finalDiagnosisResult.conditions.length > 0) {
+                            const topCondition = finalDiagnosisResult.conditions.reduce(
+                                (max: { probability: number }, cond: { probability: number }) =>
+                                    cond.probability > max.probability ? cond : max,
+                                finalDiagnosisResult.conditions[0]
+                            );
+                            addBotMessage(
+                                `Final Diagnosis: **${topCondition.name}**\n\n` +
+                                "Please consult a healthcare professional for confirmation and treatment."
+                            );
+                        } else {
+                            addBotMessage("No significant condition detected. Please consult a healthcare professional.");
+                        }
+                        setIsTyping(false);
+                        return;
                     }
 
-                    console.log("Next diagnosis result:", nextDiagnosisResult);
-
-                    setDiagnosisResult(JSON.stringify(nextDiagnosisResult, null, 2)); // Store raw result
+                    // Normal diagnosis flow
+                    const nextDiagnosisResult = await getDiagnosis(newEvidence);
+                    setDiagnosisResult(JSON.stringify(nextDiagnosisResult, null, 2));
                     setCurrDiagnosisConditions(nextDiagnosisResult.conditions || []);
                     setIsDiagnosisComplete(nextDiagnosisResult.should_stop);
                     setCurrDiagnosisQuestions(nextDiagnosisResult.question || null);
+                    setDiagnosisQuestionCount(prev => prev + 1);
 
                     setIsTyping(false);
                     if (nextDiagnosisResult.should_stop) {
@@ -420,7 +441,6 @@ export default function ChatbotPage() {
                     setIsTyping(false);
                 }
             }, 1000);
-
         } else {
             // This is a free-text input while Infermedica questions are active
             addBotMessage("Please use the provided buttons to answer the health questions. Typing free-text is not supported during this phase.");
@@ -896,7 +916,7 @@ export default function ChatbotPage() {
         </div>
       </main>
 
-      <Footer />
+      
     </div>
   )
 }
