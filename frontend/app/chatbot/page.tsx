@@ -26,7 +26,7 @@ type InfermedicaQuestionItem = {
 }
 
 type InfermedicaQuestion = {
-  type: "single" | "grouped_single" | "grouped_multiple"
+  type: "single" | "grouped_single" | "grouped_multiple" | "group_multiple"
   text: string
   items: InfermedicaQuestionItem[]
 }
@@ -202,19 +202,32 @@ export default function ChatbotPage() {
     }
   }
 
+  // Check if all items in a grouped_multiple question have been answered
+  const areAllItemsAnswered = (question: InfermedicaQuestion, selections: Record<string, string>) => {
+    if (!question || !question.items) return false
+    return question.items.every((item) => selections[item.id] !== undefined)
+  }
+
   // Handles confirmation for grouped_multiple questions
   const handleGroupedMultipleConfirm = async () => {
-    if (Object.keys(tempGroupedSelections).length === 0) {
-      addBotMessage("Please select at least one option before confirming.")
+    if (!currDiagnosisQuestions) return
+
+    const allAnswered = areAllItemsAnswered(currDiagnosisQuestions, tempGroupedSelections)
+
+    if (!allAnswered) {
+      const unansweredCount = currDiagnosisQuestions.items.length - Object.keys(tempGroupedSelections).length
+      addBotMessage(
+        `Please answer all ${currDiagnosisQuestions.items.length} questions. You have ${unansweredCount} remaining.`,
+      )
       return
     }
 
     setIsTyping(true)
-    addUserMessage("Confirmed selections.")
+    addUserMessage("Confirmed all selections.")
 
     const newEvidenceToAdd: EvidenceItem[] = Object.entries(tempGroupedSelections).map(([id, choice_id]) => ({
       id,
-      choice_id,
+      choice_id: choice_id as "present" | "absent" | "unknown",
     }))
 
     setTempGroupedSelections({})
@@ -400,59 +413,28 @@ export default function ChatbotPage() {
           return
         }
 
-        // For single and grouped_single questions, proceed immediately
-        if (currDiagnosisQuestions.type === "single" || currDiagnosisQuestions.type === "grouped_single") {
+        // Handle different question types
+        const questionType = currDiagnosisQuestions.type
+
+        if (questionType === "single") {
+          // Single question - proceed immediately
           const newEvidence = [...evidence.filter((item) => item.id !== itemId), { id: itemId, choice_id: choiceId }]
           setEvidence(newEvidence)
+          proceedWithDiagnosis(newEvidence)
+        } else if (questionType === "grouped_single") {
+          // Grouped single - proceed immediately after any selection
+          const newEvidence = [...evidence.filter((item) => item.id !== itemId), { id: itemId, choice_id: choiceId }]
+          setEvidence(newEvidence)
+          proceedWithDiagnosis(newEvidence)
+        } else if (questionType === "grouped_multiple" || questionType === "group_multiple") {
+          // Grouped multiple - store selection and wait for all answers
+          setTempGroupedSelections((prev) => ({
+            ...prev,
+            [itemId]: choiceId,
+          }))
 
-          setIsTyping(true)
-          setTimeout(async () => {
-            try {
-              if (diagnosisQuestionCount + 1 >= MAX_DIAGNOSIS_QUESTIONS) {
-                const finalDiagnosisResult = await getDiagnosis(newEvidence)
-                setDiagnosisResult(JSON.stringify(finalDiagnosisResult, null, 2))
-                setCurrDiagnosisConditions(finalDiagnosisResult.conditions || [])
-                setIsDiagnosisComplete(true)
-                setCurrDiagnosisQuestions(null)
-                setDiagnosisQuestionCount((prev) => prev + 1)
-
-                displayFinalDiagnosis(finalDiagnosisResult.conditions)
-                setIsTyping(false)
-                return
-              }
-
-              const nextDiagnosisResult = await getDiagnosis(newEvidence)
-              setDiagnosisResult(JSON.stringify(nextDiagnosisResult, null, 2))
-              setCurrDiagnosisConditions(nextDiagnosisResult.conditions || [])
-              setIsDiagnosisComplete(nextDiagnosisResult.should_stop)
-              setCurrDiagnosisQuestions(nextDiagnosisResult.question || null)
-              setDiagnosisQuestionCount((prev) => prev + 1)
-
-              setIsTyping(false)
-
-              // Show conditions update
-              if (nextDiagnosisResult.conditions && nextDiagnosisResult.conditions.length > 0) {
-                displayConditionsUpdate(nextDiagnosisResult.conditions)
-              }
-
-              if (nextDiagnosisResult.should_stop) {
-                displayFinalDiagnosis(nextDiagnosisResult.conditions)
-              } else if (nextDiagnosisResult.question) {
-                setTimeout(() => {
-                  addBotMessage(nextDiagnosisResult.question)
-                }, 2000)
-              } else {
-                addBotMessage(
-                  "The diagnosis process needs more information, but I couldn't generate the next question. Please consult a healthcare professional.",
-                )
-              }
-            } catch (error) {
-              console.error("Error during subsequent diagnosis:", error)
-              const errorMessage = error instanceof Error ? error.message : "An unknown error occurred."
-              addBotMessage(`An error occurred: ${errorMessage}. Please try again.`)
-              setIsTyping(false)
-            }
-          }, 1000)
+          // Don't proceed automatically - wait for confirmation
+          console.log(`Selected ${itemId}: ${choiceId}. Waiting for more selections...`)
         }
       } else {
         addBotMessage("Please use the provided buttons to answer the health questions.")
@@ -464,6 +446,59 @@ export default function ChatbotPage() {
     } else {
       addBotMessage("An unexpected state occurred. Please try again or refresh the page.")
     }
+  }
+
+  // Helper function to proceed with diagnosis
+  const proceedWithDiagnosis = async (newEvidence: EvidenceItem[]) => {
+    setIsTyping(true)
+
+    setTimeout(async () => {
+      try {
+        if (diagnosisQuestionCount + 1 >= MAX_DIAGNOSIS_QUESTIONS) {
+          const finalDiagnosisResult = await getDiagnosis(newEvidence)
+          setDiagnosisResult(JSON.stringify(finalDiagnosisResult, null, 2))
+          setCurrDiagnosisConditions(finalDiagnosisResult.conditions || [])
+          setIsDiagnosisComplete(true)
+          setCurrDiagnosisQuestions(null)
+          setDiagnosisQuestionCount((prev) => prev + 1)
+
+          displayFinalDiagnosis(finalDiagnosisResult.conditions)
+          setIsTyping(false)
+          return
+        }
+
+        const nextDiagnosisResult = await getDiagnosis(newEvidence)
+        setDiagnosisResult(JSON.stringify(nextDiagnosisResult, null, 2))
+        setCurrDiagnosisConditions(nextDiagnosisResult.conditions || [])
+        setIsDiagnosisComplete(nextDiagnosisResult.should_stop)
+        setCurrDiagnosisQuestions(nextDiagnosisResult.question || null)
+        setDiagnosisQuestionCount((prev) => prev + 1)
+
+        setIsTyping(false)
+
+        // Show conditions update
+        if (nextDiagnosisResult.conditions && nextDiagnosisResult.conditions.length > 0) {
+          displayConditionsUpdate(nextDiagnosisResult.conditions)
+        }
+
+        if (nextDiagnosisResult.should_stop) {
+          displayFinalDiagnosis(nextDiagnosisResult.conditions)
+        } else if (nextDiagnosisResult.question) {
+          setTimeout(() => {
+            addBotMessage(nextDiagnosisResult.question)
+          }, 2000)
+        } else {
+          addBotMessage(
+            "The diagnosis process needs more information, but I couldn't generate the next question. Please consult a healthcare professional.",
+          )
+        }
+      } catch (error) {
+        console.error("Error during diagnosis:", error)
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred."
+        addBotMessage(`An error occurred: ${errorMessage}. Please try again.`)
+        setIsTyping(false)
+      }
+    }, 1000)
   }
 
   // API calls
@@ -595,7 +630,7 @@ export default function ChatbotPage() {
               ) : currDiagnosisQuestions ? (
                 <div className="inline-flex items-center px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-full text-sm font-medium">
                   <TrendingUp className="h-4 w-4 mr-2" />
-                  Analyzing Symptoms...
+                  Analyzing Symptoms... ({diagnosisQuestionCount}/{MAX_DIAGNOSIS_QUESTIONS})
                 </div>
               ) : (
                 <div className="inline-flex items-center px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 rounded-full text-sm font-medium">
@@ -665,11 +700,27 @@ export default function ChatbotPage() {
                       ) : (
                         (() => {
                           const questionContent: InfermedicaQuestion = message.content
+                          const isMultipleType =
+                            questionContent.type === "grouped_multiple" || questionContent.type === "group_multiple"
+
                           return (
                             <div>
                               <p className="text-sm font-semibold leading-relaxed mb-4 text-gray-900 dark:text-white">
                                 {questionContent.text}
                               </p>
+
+                              {/* Show question type indicator */}
+                              <div className="mb-4">
+                                <span
+                                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                    isMultipleType
+                                      ? "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200"
+                                      : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200"
+                                  }`}
+                                >
+                                  {isMultipleType ? "Answer all questions below" : "Select one option"}
+                                </span>
+                              </div>
 
                               {questionContent.items && questionContent.items.length > 0 && (
                                 <div className="space-y-4">
@@ -680,13 +731,16 @@ export default function ChatbotPage() {
                                     >
                                       <p className="text-sm font-medium text-gray-800 dark:text-gray-200 mb-3">
                                         {item.name}
+                                        {isMultipleType && tempGroupedSelections[item.id] && (
+                                          <span className="ml-2 text-green-600 dark:text-green-400">✓</span>
+                                        )}
                                       </p>
                                       <div className="flex flex-wrap gap-2">
                                         {item.choices.map((choice: InfermedicaChoice) => (
                                           <button
                                             key={choice.id}
                                             onClick={() => {
-                                              if (questionContent.type === "grouped_multiple") {
+                                              if (isMultipleType) {
                                                 setTempGroupedSelections((prev) => ({
                                                   ...prev,
                                                   [item.id]: choice.id,
@@ -697,8 +751,7 @@ export default function ChatbotPage() {
                                             }}
                                             className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 transform hover:scale-105
                                                         ${
-                                                          questionContent.type === "grouped_multiple" &&
-                                                          tempGroupedSelections[item.id] === choice.id
+                                                          isMultipleType && tempGroupedSelections[item.id] === choice.id
                                                             ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg"
                                                             : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-blue-800"
                                                         }`}
@@ -710,15 +763,21 @@ export default function ChatbotPage() {
                                     </div>
                                   ))}
 
-                                  {questionContent.type === "grouped_multiple" && (
+                                  {isMultipleType && (
                                     <div className="mt-6 text-center border-t border-gray-200 dark:border-gray-700 pt-4">
+                                      <div className="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                                        Answered: {Object.keys(tempGroupedSelections).length} /{" "}
+                                        {questionContent.items.length}
+                                      </div>
                                       <button
                                         onClick={handleGroupedMultipleConfirm}
-                                        disabled={Object.keys(tempGroupedSelections).length === 0}
+                                        disabled={!areAllItemsAnswered(questionContent, tempGroupedSelections)}
                                         className="px-8 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-full font-semibold
                                                    hover:shadow-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                                       >
-                                        Confirm Selections ({Object.keys(tempGroupedSelections).length})
+                                        {areAllItemsAnswered(questionContent, tempGroupedSelections)
+                                          ? "Confirm All Answers"
+                                          : `Answer All Questions (${Object.keys(tempGroupedSelections).length}/${questionContent.items.length})`}
                                       </button>
                                     </div>
                                   )}
@@ -868,7 +927,11 @@ export default function ChatbotPage() {
 
           {currDiagnosisQuestions && !isDiagnosisComplete && (
             <div className="bg-white/80 backdrop-blur-sm dark:bg-gray-800/80 border-t border-gray-200/50 dark:border-gray-700/50 p-6 text-center text-gray-600 dark:text-gray-400">
-              <p className="text-sm">Please select your answers from the options above to continue 👆</p>
+              <p className="text-sm">
+                {currDiagnosisQuestions.type === "grouped_multiple" || currDiagnosisQuestions.type === "group_multiple"
+                  ? "Please answer all questions above, then click 'Confirm All Answers' 👆"
+                  : "Please select your answer from the options above to continue 👆"}
+              </p>
             </div>
           )}
         </div>
@@ -906,7 +969,10 @@ export default function ChatbotPage() {
                 <div className="flex items-start space-x-3 p-4 bg-blue-50/80 dark:bg-blue-900/20 rounded-xl border border-blue-100/50 dark:border-blue-800/50 backdrop-blur-sm">
                   <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
                   <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                    If unsure, select "Don't know" or "Unknown".
+                    {currDiagnosisQuestions?.type === "grouped_multiple" ||
+                    currDiagnosisQuestions?.type === "group_multiple"
+                      ? "For multiple choice questions, answer ALL items before confirming."
+                      : "For single questions, select one option to continue immediately."}
                   </p>
                 </div>
               </div>
