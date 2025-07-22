@@ -41,7 +41,7 @@ type InfermedicaQuestionItem = {
 }
 
 type InfermedicaQuestion = {
-  type: "single" | "grouped_single" | "grouped_multiple" | "group_multiple"
+  type: "single" | "group_single" | "group_multiple"
   text: string
   items: InfermedicaQuestionItem[]
 }
@@ -346,7 +346,7 @@ export default function ChatbotPage() {
     }, 1000)
   }
 
-  // Helper function to proceed with diagnosis (for single/grouped_single types)
+  // Helper function to proceed with diagnosis (for single/group_single types)
   const proceedWithDiagnosis = async (currentEvidence: EvidenceItem[]) => {
     setIsTyping(true)
 
@@ -424,11 +424,11 @@ export default function ChatbotPage() {
 
         const questionType = currDiagnosisQuestions.type
 
-        if (questionType === "single" || questionType === "grouped_single") {
+        if (questionType === "single" || questionType === "group_single") {
           const newEvidence = [...evidence.filter((item) => item.id !== itemId), { id: itemId, choice_id: choiceId }]
           setEvidence(newEvidence)
           await proceedWithDiagnosis(newEvidence)
-        } else if (questionType === "grouped_multiple" || questionType === "group_multiple") {
+        } else if (questionType === "group_multiple") {
           setTempGroupedSelections((prev) => ({
             ...prev,
             [itemId]: choiceId,
@@ -842,7 +842,7 @@ export default function ChatbotPage() {
                         (() => {
                           const questionContent: InfermedicaQuestion = message.content
                           const isMultipleType =
-                            questionContent.type === "grouped_multiple" || questionContent.type === "group_multiple"
+                            questionContent.type === "group_multiple"
 
                           return (
                             <div>
@@ -1086,7 +1086,7 @@ export default function ChatbotPage() {
           {currDiagnosisQuestions && !isDiagnosisComplete && (
             <div className="bg-white/80 backdrop-blur-sm dark:bg-gray-800/80 border-t border-gray-200/50 dark:border-gray-700/50 p-6 text-center text-gray-600 dark:text-gray-400">
               <p className="text-sm">
-                {currDiagnosisQuestions.type === "grouped_multiple" || currDiagnosisQuestions.type === "group_multiple"
+                {currDiagnosisQuestions.type === "group_multiple"
                   ? "Please answer all questions above, then click 'Confirm All Answers' 👆"
                   : "Please select your answer from the options above to continue 👆"}
               </p>
@@ -1127,7 +1127,7 @@ export default function ChatbotPage() {
                 <div className="flex items-start space-x-3 p-4 bg-blue-50/80 dark:bg-blue-900/20 rounded-xl border border-blue-100/50 dark:border-blue-800/50 backdrop-blur-sm">
                   <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
                   <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                    {currDiagnosisQuestions.type === "grouped_multiple" ||
+                    {
                     currDiagnosisQuestions.type === "group_multiple"
                       ? "For multiple choice questions, answer ALL items before confirming."
                       : "For single questions, select one option to continue immediately."}
