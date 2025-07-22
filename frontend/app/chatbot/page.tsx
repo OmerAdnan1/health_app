@@ -841,8 +841,7 @@ export default function ChatbotPage() {
                         // Regular Infermedica Question Display
                         (() => {
                           const questionContent: InfermedicaQuestion = message.content
-                          const isMultipleType =
-                            questionContent.type === "group_multiple"
+                          const isMultipleType = questionContent.type === "group_multiple"
 
                           return (
                             <div>
@@ -983,7 +982,7 @@ export default function ChatbotPage() {
           </div>
 
           {/* Input Area */}
-          {(!currDiagnosisQuestions || isDiagnosisComplete) && (
+          {!currDiagnosisQuestions && !isDiagnosisComplete && (
             <div className="bg-white/80 backdrop-blur-sm dark:bg-gray-800/80 border-t border-gray-200/50 dark:border-gray-700/50 p-6 transition-colors">
               <div className="max-w-4xl mx-auto">
                 {currentStep < questions.length &&
@@ -1127,8 +1126,7 @@ export default function ChatbotPage() {
                 <div className="flex items-start space-x-3 p-4 bg-blue-50/80 dark:bg-blue-900/20 rounded-xl border border-blue-100/50 dark:border-blue-800/50 backdrop-blur-sm">
                   <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
                   <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                    {
-                    currDiagnosisQuestions.type === "group_multiple"
+                    {currDiagnosisQuestions.type === "group_multiple"
                       ? "For multiple choice questions, answer ALL items before confirming."
                       : "For single questions, select one option to continue immediately."}
                   </p>
