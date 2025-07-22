@@ -3,13 +3,15 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Activity, Moon, Sun, Bell, Settings, Menu, X } from "lucide-react"
 import { useTheme } from "./ThemeProvider"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 export default function Header({ className = "" }) {
   const pathname = usePathname()
   const { theme, toggleTheme } = useTheme()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [notifications] = useState(3) // Mock notification count
+  const [isVisible, setIsVisible] = useState(true)
+  const [lastScrollY, setLastScrollY] = useState(0)
 
   const navItems = [
     { href: "/", label: "Home" },
@@ -18,9 +20,39 @@ export default function Header({ className = "" }) {
     { href: "/planner", label: "Planner" },
   ]
 
+  // Auto-hide header on scroll
+  useEffect(() => {
+    const controlHeader = () => {
+      const currentScrollY = window.scrollY
+
+      // Show header when scrolling up or at top
+      if (currentScrollY < lastScrollY || currentScrollY < 10) {
+        setIsVisible(true)
+      }
+      // Hide header when scrolling down (but not if mobile menu is open)
+      else if (currentScrollY > lastScrollY && currentScrollY > 100 && !isMobileMenuOpen) {
+        setIsVisible(false)
+      }
+
+      setLastScrollY(currentScrollY)
+    }
+
+    window.addEventListener("scroll", controlHeader)
+    return () => window.removeEventListener("scroll", controlHeader)
+  }, [lastScrollY, isMobileMenuOpen])
+
+  // Keep header visible when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      setIsVisible(true)
+    }
+  }, [isMobileMenuOpen])
+
   return (
     <header
-      className={`fixed top-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 z-50 transition-colors ${className}`}
+      className={`fixed top-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 z-50 transition-all duration-300 ease-in-out ${
+        isVisible ? "translate-y-0" : "-translate-y-full"
+      } ${className}`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
