@@ -99,6 +99,7 @@ export default function ChatbotPage() {
   const [diagnosisResult, setDiagnosisResult] = useState<string | null>(null)
   const [evidence, setEvidence] = useState<EvidenceItem[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
   const [interviewId, setInterviewId] = useState<string | null>(null)
 
   const [currDiagnosisQuestions, setCurrDiagnosisQuestions] = useState<InfermedicaQuestion | null>(null)
@@ -159,15 +160,16 @@ export default function ChatbotPage() {
     }
   }, [])
 
-  // Controlled auto-scroll - only scroll when bot is typing or when user sends a message
-  useEffect(() => {
-    if (isTyping) {
-      scrollToBottom()
-    }
-  }, [isTyping])
-
+  // Improved scroll behavior - only scroll when user is near bottom
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (chatContainerRef.current) {
+      const container = chatContainerRef.current
+      const isNearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 200
+
+      if (isNearBottom) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+      }
+    }
   }
 
   // Generate unique ID for messages
@@ -187,10 +189,12 @@ export default function ChatbotPage() {
         },
       ])
       setIsTyping(false)
+      // Only scroll if user was already near bottom
+      setTimeout(scrollToBottom, 100)
     }, 800)
   }
 
-  // Add user message
+  // Add user message with smart scrolling
   const addUserMessage = (content: string) => {
     setMessages((prev) => [
       ...prev,
@@ -201,8 +205,8 @@ export default function ChatbotPage() {
         timestamp: new Date(),
       },
     ])
-    // Only scroll after user message, not after every interaction
-    setTimeout(() => scrollToBottom(), 100)
+    // Always scroll after user message since they just interacted
+    setTimeout(scrollToBottom, 100)
   }
 
   // Speech recognition function
@@ -651,9 +655,12 @@ export default function ChatbotPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col transition-colors">
-      <Header />
+      {/* Fixed Header */}
+      <div className="fixed top-0 left-0 right-0 z-50">
+        <Header />
+      </div>
 
-      <main className="flex-1 pt-16 flex">
+      <main className="flex-1 flex mt-16">
         {/* Chat Area */}
         <div className="flex-1 flex flex-col">
           {/* Header Section */}
@@ -689,7 +696,7 @@ export default function ChatbotPage() {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-6">
             <div className="max-w-4xl mx-auto space-y-6">
               {messages.map((message) => (
                 <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
@@ -981,121 +988,123 @@ export default function ChatbotPage() {
             </div>
           </div>
 
-          {/* Input Area */}
-          {!currDiagnosisQuestions && !isDiagnosisComplete && (
-            <div className="bg-white/80 backdrop-blur-sm dark:bg-gray-800/80 border-t border-gray-200/50 dark:border-gray-700/50 p-6 transition-colors">
-              <div className="max-w-4xl mx-auto">
-                {currentStep < questions.length &&
-                  (currentQuestion?.type === "text" || currentQuestion?.type === "age") && (
-                    <div className="flex space-x-4">
-                      <div className="flex-1 relative">
-                        <input
-                          type={currentQuestion?.type === "age" ? "number" : "text"}
-                          min={currentQuestion?.type === "age" ? 0 : undefined}
-                          value={currentInput}
-                          onChange={(e) => setCurrentInput(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                          placeholder={
-                            currentQuestion?.type === "age" ? "Enter your age in years" : "Type your response..."
-                          }
-                          className="w-full px-6 py-4 border border-gray-300/50 dark:border-gray-600/50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/90 dark:bg-gray-700/90 text-gray-900 dark:text-white transition-colors backdrop-blur-sm"
-                        />
-                        {currentQuestion?.type === "text" && (
-                          <button
-                            onClick={startListening}
-                            disabled={isListening || isSpeaking}
-                            className={`absolute right-4 top-1/2 transform -translate-y-1/2 p-2 rounded-full transition-colors ${
-                              isListening
-                                ? "bg-red-500 text-white animate-pulse"
-                                : isSpeaking
-                                  ? "bg-gray-400 text-white cursor-not-allowed"
-                                  : "text-gray-400 hover:text-blue-500 dark:hover:text-blue-400"
-                            }`}
-                          >
-                            {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-                          </button>
-                        )}
+          {/* Input Area - Fixed at bottom */}
+          <div className="sticky bottom-0 bg-white/95 backdrop-blur-sm dark:bg-gray-800/95 border-t border-gray-200/50 dark:border-gray-700/50 transition-colors">
+            {!currDiagnosisQuestions && !isDiagnosisComplete && (
+              <div className="p-6">
+                <div className="max-w-4xl mx-auto">
+                  {currentStep < questions.length &&
+                    (currentQuestion?.type === "text" || currentQuestion?.type === "age") && (
+                      <div className="flex space-x-4">
+                        <div className="flex-1 relative">
+                          <input
+                            type={currentQuestion?.type === "age" ? "number" : "text"}
+                            min={currentQuestion?.type === "age" ? 0 : undefined}
+                            value={currentInput}
+                            onChange={(e) => setCurrentInput(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                            placeholder={
+                              currentQuestion?.type === "age" ? "Enter your age in years" : "Type your response..."
+                            }
+                            className="w-full px-6 py-4 border border-gray-300/50 dark:border-gray-600/50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/90 dark:bg-gray-700/90 text-gray-900 dark:text-white transition-colors backdrop-blur-sm"
+                          />
+                          {currentQuestion?.type === "text" && (
+                            <button
+                              onClick={startListening}
+                              disabled={isListening || isSpeaking}
+                              className={`absolute right-4 top-1/2 transform -translate-y-1/2 p-2 rounded-full transition-colors ${
+                                isListening
+                                  ? "bg-red-500 text-white animate-pulse"
+                                  : isSpeaking
+                                    ? "bg-gray-400 text-white cursor-not-allowed"
+                                    : "text-gray-400 hover:text-blue-500 dark:hover:text-blue-400"
+                              }`}
+                            >
+                              {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                            </button>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleSendMessage()}
+                          disabled={!currentInput.trim()}
+                          className="px-8 py-4 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-2xl hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:scale-105 disabled:hover:scale-100"
+                        >
+                          <Send className="h-5 w-5" />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => handleSendMessage()}
-                        disabled={!currentInput.trim()}
-                        className="px-8 py-4 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-2xl hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:scale-105 disabled:hover:scale-100"
-                      >
-                        <Send className="h-5 w-5" />
-                      </button>
+                    )}
+
+                  {currentStep < questions.length && currentQuestion?.type === "select" && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {currentQuestion.options?.map((option, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleSendMessage(option)}
+                          className="p-6 text-center border-2 border-gray-200/50 dark:border-gray-600/50 rounded-2xl hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-300 hover:shadow-lg hover:scale-105 bg-white/90 dark:bg-gray-800/90 text-gray-900 dark:text-white backdrop-blur-sm"
+                        >
+                          <div className="font-medium capitalize">{option}</div>
+                        </button>
+                      ))}
                     </div>
                   )}
-
-                {currentStep < questions.length && currentQuestion?.type === "select" && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {currentQuestion.options?.map((option, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleSendMessage(option)}
-                        className="p-6 text-center border-2 border-gray-200/50 dark:border-gray-600/50 rounded-2xl hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-300 hover:shadow-lg hover:scale-105 bg-white/90 dark:bg-gray-800/90 text-gray-900 dark:text-white backdrop-blur-sm"
-                      >
-                        <div className="font-medium capitalize">{option}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {isDiagnosisComplete && (
-                  <div className="text-center">
-                    <button
-                      onClick={() => {
-                        // Reset all states for a new assessment
-                        setUserAge(null)
-                        setUserSex(null)
-                        setMessages([])
-                        setCurrentInput("")
-                        setCurrentStep(0)
-                        setIsTyping(false)
-                        setIsListening(false)
-                        setIsSpeaking(false)
-                        setDiagnosisResult(null)
-                        setEvidence([])
-                        setInterviewId(null)
-                        setCurrDiagnosisQuestions(null)
-                        setCurrDiagnosisConditions([])
-                        setIsDiagnosisComplete(false)
-                        setTempGroupedSelections({})
-                        setDiagnosisQuestionCount(0)
-
-                        // Restart the conversation flow
-                        setTimeout(() => {
-                          addBotMessage(
-                            "Hello! I'm your HealthBuddy AI assistant. I'll help analyze your symptoms and provide personalized health insights. Let's start with a few questions.",
-                          )
-                          setTimeout(() => {
-                            addBotMessage(questions[0].question)
-                          }, 1000)
-                        }, 500)
-                      }}
-                      className="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-2xl hover:shadow-lg transition-all duration-300 hover:scale-105"
-                    >
-                      Start New Assessment 🔄
-                    </button>
-                  </div>
-                )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {currDiagnosisQuestions && !isDiagnosisComplete && (
-            <div className="bg-white/80 backdrop-blur-sm dark:bg-gray-800/80 border-t border-gray-200/50 dark:border-gray-700/50 p-6 text-center text-gray-600 dark:text-gray-400">
-              <p className="text-sm">
-                {currDiagnosisQuestions.type === "group_multiple"
-                  ? "Please answer all questions above, then click 'Confirm All Answers' 👆"
-                  : "Please select your answer from the options above to continue 👆"}
-              </p>
-            </div>
-          )}
+            {isDiagnosisComplete && (
+              <div className="p-6 text-center">
+                <button
+                  onClick={() => {
+                    // Reset all states for a new assessment
+                    setUserAge(null)
+                    setUserSex(null)
+                    setMessages([])
+                    setCurrentInput("")
+                    setCurrentStep(0)
+                    setIsTyping(false)
+                    setIsListening(false)
+                    setIsSpeaking(false)
+                    setDiagnosisResult(null)
+                    setEvidence([])
+                    setInterviewId(null)
+                    setCurrDiagnosisQuestions(null)
+                    setCurrDiagnosisConditions([])
+                    setIsDiagnosisComplete(false)
+                    setTempGroupedSelections({})
+                    setDiagnosisQuestionCount(0)
+
+                    // Restart the conversation flow
+                    setTimeout(() => {
+                      addBotMessage(
+                        "Hello! I'm your HealthBuddy AI assistant. I'll help analyze your symptoms and provide personalized health insights. Let's start with a few questions.",
+                      )
+                      setTimeout(() => {
+                        addBotMessage(questions[0].question)
+                      }, 1000)
+                    }, 500)
+                  }}
+                  className="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-2xl hover:shadow-lg transition-all duration-300 hover:scale-105"
+                >
+                  Start New Assessment 🔄
+                </button>
+              </div>
+            )}
+
+            {currDiagnosisQuestions && !isDiagnosisComplete && (
+              <div className="p-6 text-center text-gray-600 dark:text-gray-400">
+                <p className="text-sm">
+                  {currDiagnosisQuestions.type === "group_multiple"
+                    ? "Please answer all questions above, then click 'Confirm All Answers' 👆"
+                    : "Please select your answer from the options above to continue 👆"}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Enhanced Tips Sidebar */}
-        <div className="w-80 bg-white/80 backdrop-blur-sm dark:bg-gray-800/80 border-l border-gray-200/50 dark:border-gray-700/50 p-6 hidden lg:block transition-colors">
-          <div className="sticky top-24 space-y-6">
+        <div className="w-80 bg-white/80 backdrop-blur-sm dark:bg-gray-800/80 border-l border-gray-200/50 dark:border-gray-700/50 p-6 hidden lg:block transition-colors overflow-y-auto">
+          <div className="space-y-6">
             <div className="flex items-center space-x-3 mb-6">
               <div className="p-2 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl">
                 <Lightbulb className="h-5 w-5 text-white" />
