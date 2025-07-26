@@ -19,6 +19,9 @@ app.use(express.json()); // <-- Enable parsing JSON request bodies
 import infermedicaRoutes from "./apis/infermedica";
 app.use("/api/infermedica", infermedicaRoutes); // <-- Register routes AFTER middleware
 
+import geminiRouter from "./apis/gemini";
+app.use("/api", geminiRouter);
+
 // Infermedica API Credentials from environment variables
 const INFERMEDICA_APP_ID = process.env.INFERMEDICA_APP_ID;
 const INFERMEDICA_APP_KEY = process.env.INFERMEDICA_APP_KEY;

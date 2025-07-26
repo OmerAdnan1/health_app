@@ -623,8 +623,18 @@ export default function ChatbotPage() {
     }
   }
 
+  async function askGemini(prompt: string) {
+    const res = await fetch("http://localhost:5000/api/gemini", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    })
+    const data = await res.json()
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "No response"
+  }
+
   // Enhanced final diagnosis display
-  const displayFinalDiagnosis = (conditions: Condition[]) => {
+  const displayFinalDiagnosis = async (conditions: Condition[]) => {
     // Create a structured final diagnosis message
     const finalDiagnosisContent = {
       type: "final_diagnosis",
@@ -632,6 +642,22 @@ export default function ChatbotPage() {
     }
 
     addBotMessage(finalDiagnosisContent as any)
+
+    // If there is a top condition, ask Gemini for more info and treatment
+    if (conditions && conditions.length > 0) {
+      const topCondition = conditions.reduce(
+        (max: Condition, cond: Condition) => (cond.probability > max.probability ? cond : max),
+        conditions[0],
+      )
+      // Custom prompt for Gemini
+      const geminiPrompt = `Provide a brief explanation and common treatment methods with headings in maximum 500 words for the medical condition "${topCondition.common_name || topCondition.name}". Please include what it is, typical symptoms, and standard treatments.`
+
+      // Ask Gemini and display the response
+      const geminiResponse = await askGemini(geminiPrompt)
+      addBotMessage(
+        `**More information about ${topCondition.common_name || topCondition.name}:**\n\n${geminiResponse}`,
+      )
+    }
   }
 
   const currentQuestion = questions[currentStep]
