@@ -49,6 +49,7 @@ type InfermedicaQuestion = {
 type EvidenceItem = {
   id: string
   choice_id: "present" | "absent" | "unknown"
+  source?: "initial" | "suggest" | "predefined" | "red_flags"  // source of evidence per Infermedica API
 }
 
 type Condition = {
@@ -56,6 +57,23 @@ type Condition = {
   name: string
   common_name: string
   probability: number
+  details?: {
+    description?: string
+    severity?: string
+    category?: string
+    treatment_description?: string
+    icd10?: string
+    acuteness?: string
+    prevalence?: string
+  }
+}
+
+type DiagnosisResponse = {
+  question?: InfermedicaQuestion
+  conditions: Condition[]
+  should_stop: boolean
+  evidence?: EvidenceItem[]
+  reasoning?: string[]
 }
 
 type InitialQuestion = {
@@ -85,10 +103,16 @@ const parseJsonResponse = async (response: Response) => {
   }
 }
 
+// Helper function to normalize text input for better parsing
+const normalizeText = (input: string): string => {
+  return input.trim().replace(/\s+/g, " ").toLowerCase()
+}
+
 export default function ChatbotPage() {
   const router = useRouter()
   const [userAge, setUserAge] = useState<number | null>(null)
   const [userSex, setUserSex] = useState<"male" | "female" | "other" | null>(null)
+  const [userLocation, setUserLocation] = useState<string | null>(null)
 
   const [messages, setMessages] = useState<Message[]>([])
   const [currentInput, setCurrentInput] = useState<string>("")
@@ -108,8 +132,11 @@ export default function ChatbotPage() {
   const [tempGroupedSelections, setTempGroupedSelections] = useState<Record<string, "present" | "absent" | "unknown">>(
     {},
   )
-  const MAX_DIAGNOSIS_QUESTIONS = 8
+  const MAX_DIAGNOSIS_QUESTIONS = 18 // Increased from 8 for better accuracy
   const [diagnosisQuestionCount, setDiagnosisQuestionCount] = useState(0)
+  const [showMaxQuestionsChoice, setShowMaxQuestionsChoice] = useState<boolean>(false)
+  const [continuePastMaxQuestions, setContinuePastMaxQuestions] = useState<boolean>(false)
+  const [emergencySymptoms, setEmergencySymptoms] = useState<string[]>([])
 
   // Initial fixed questions for the bot
   const questions: InitialQuestion[] = [
@@ -135,13 +162,26 @@ export default function ChatbotPage() {
       ],
     },
     {
+      id: "location",
+      question: "What is your current location or recent travel history?",
+      type: "select",
+      options: ["United States/Canada", "Europe", "Asia", "Africa", "South America", "Australia/Oceania", "Middle East", "No recent travel"],
+      tips: [
+        "Location helps identify region-specific conditions",
+        "Recent travel can indicate exposure to different diseases",
+        "This helps with accurate risk assessment",
+      ],
+    },
+    {
       id: "symptoms",
-      question: "What symptoms are you experiencing? Please describe them in detail.",
+      question: "What symptoms are you experiencing? Please describe them in detail including when they started, how severe they are, and what makes them better or worse.",
       type: "text",
       tips: [
-        "Be specific about location, intensity, and duration",
-        "Mention any triggers you've noticed",
-        "Include associated symptoms for better analysis",
+        "Include WHEN symptoms started (hours/days/weeks ago)",
+        "Describe the SEVERITY (mild, moderate, severe)",
+        "Mention what makes symptoms BETTER or WORSE",
+        "Include ALL related symptoms, even minor ones",
+        "Be specific about LOCATION (which part of body)",
       ],
     },
   ]
@@ -248,7 +288,7 @@ export default function ChatbotPage() {
     recognition.start()
   }
 
-  // Display current conditions with probabilities
+  // Display current conditions with probabilities and additional details
   const displayConditionsUpdate = (conditions: Condition[]) => {
     if (conditions && conditions.length > 0) {
       const sortedConditions = conditions.sort((a, b) => b.probability - a.probability)
@@ -257,11 +297,36 @@ export default function ChatbotPage() {
       sortedConditions.slice(0, 3).forEach((condition, index) => {
         const percentage = (condition.probability * 100).toFixed(1)
         const emoji = index === 0 ? "🔴" : index === 1 ? "🟡" : "🟢"
-        conditionsMessage += `${emoji} ${condition.common_name || condition.name}: ${percentage}%\n`
+        conditionsMessage += `${emoji} ${condition.common_name || condition.name}: ${percentage}%`
+        
+        // Add severity information if available
+        if (condition.details?.severity) {
+          conditionsMessage += ` (${condition.details.severity})`
+        }
+        
+        // Add acuteness information if available
+        if (condition.details?.acuteness) {
+          conditionsMessage += ` [${condition.details.acuteness}]`
+        }
+        
+        conditionsMessage += "\n"
+        
+        // Add description if available
+        if (condition.details?.description) {
+          conditionsMessage += `   ℹ️ ${condition.details.description.substring(0, 100)}${condition.details.description.length > 100 ? '...' : ''}\n`
+        }
       })
 
       conditionsMessage += "\n💡 These are preliminary assessments. Let's continue with more questions for accuracy."
       addBotMessage(conditionsMessage)
+
+      // Show emergency warning if any emergency symptoms have been detected so far
+      if (emergencySymptoms.length > 0) {
+        const emergencyWarning = `🚨 **IMPORTANT NOTICE**: Emergency symptoms have been detected during this assessment:\n\n${emergencySymptoms.map(symptom => `⚠️ ${symptom}`).join('\n')}\n\n**While we continue the assessment for completeness, please consider seeking immediate medical attention if symptoms are severe or worsening.**`
+        setTimeout(() => {
+          addBotMessage(emergencyWarning)
+        }, 1500)
+      }
     }
   }
 
@@ -291,7 +356,10 @@ export default function ChatbotPage() {
     const newEvidenceToAdd: EvidenceItem[] = Object.entries(tempGroupedSelections).map(([id, choice_id]) => ({
       id,
       choice_id: choice_id as "present" | "absent" | "unknown",
+      // No source attribute for evidence gathered during dynamic interview per Infermedica docs
     }))
+
+    console.log(`Adding ${newEvidenceToAdd.length} dynamic interview evidence items from questions:`, newEvidenceToAdd)
 
     setTempGroupedSelections({})
 
@@ -304,25 +372,15 @@ export default function ChatbotPage() {
 
     setTimeout(async () => {
       try {
-        if (diagnosisQuestionCount + 1 >= MAX_DIAGNOSIS_QUESTIONS) {
-          const finalDiagnosisResult = await getDiagnosis(combinedEvidence)
-          setDiagnosisResult(JSON.stringify(finalDiagnosisResult, null, 2))
-          setCurrDiagnosisConditions(finalDiagnosisResult.conditions || [])
-          setIsDiagnosisComplete(true)
-          setCurrDiagnosisQuestions(null)
-          setDiagnosisQuestionCount((prev) => prev + 1)
-
-          displayFinalDiagnosis(finalDiagnosisResult.conditions)
-          setIsTyping(false)
-          return
-        }
-
         const nextDiagnosisResult = await getDiagnosis(combinedEvidence)
         setDiagnosisResult(JSON.stringify(nextDiagnosisResult, null, 2))
         setCurrDiagnosisConditions(nextDiagnosisResult.conditions || [])
-        setIsDiagnosisComplete(nextDiagnosisResult.should_stop)
         setCurrDiagnosisQuestions(nextDiagnosisResult.question || null)
         setDiagnosisQuestionCount((prev) => prev + 1)
+
+        // Smart stop logic
+        const shouldStop = smartStopLogic(nextDiagnosisResult, diagnosisQuestionCount + 1)
+        setIsDiagnosisComplete(shouldStop)
 
         setIsTyping(false)
 
@@ -330,8 +388,18 @@ export default function ChatbotPage() {
           displayConditionsUpdate(nextDiagnosisResult.conditions)
         }
 
-        if (nextDiagnosisResult.should_stop) {
-          displayFinalDiagnosis(nextDiagnosisResult.conditions)
+        if (shouldStop) {
+          if (showMaxQuestionsChoice) {
+            // Show choice message instead of ending diagnosis
+            const choiceMessage = {
+              type: "max_questions_choice",
+              questionCount: diagnosisQuestionCount + 1,
+              conditions: nextDiagnosisResult.conditions || []
+            }
+            addBotMessage(choiceMessage as any)
+          } else {
+            displayFinalDiagnosis(nextDiagnosisResult.conditions)
+          }
         } else if (nextDiagnosisResult.question) {
           setTimeout(() => {
             addBotMessage(nextDiagnosisResult.question)
@@ -356,25 +424,15 @@ export default function ChatbotPage() {
 
     setTimeout(async () => {
       try {
-        if (diagnosisQuestionCount + 1 >= MAX_DIAGNOSIS_QUESTIONS) {
-          const finalDiagnosisResult = await getDiagnosis(currentEvidence)
-          setDiagnosisResult(JSON.stringify(finalDiagnosisResult, null, 2))
-          setCurrDiagnosisConditions(finalDiagnosisResult.conditions || [])
-          setIsDiagnosisComplete(true)
-          setCurrDiagnosisQuestions(null)
-          setDiagnosisQuestionCount((prev) => prev + 1)
-
-          displayFinalDiagnosis(finalDiagnosisResult.conditions)
-          setIsTyping(false)
-          return
-        }
-
         const nextDiagnosisResult = await getDiagnosis(currentEvidence)
         setDiagnosisResult(JSON.stringify(nextDiagnosisResult, null, 2))
         setCurrDiagnosisConditions(nextDiagnosisResult.conditions || [])
-        setIsDiagnosisComplete(nextDiagnosisResult.should_stop)
         setCurrDiagnosisQuestions(nextDiagnosisResult.question || null)
         setDiagnosisQuestionCount((prev) => prev + 1)
+
+        // Smart stop logic
+        const shouldStop = smartStopLogic(nextDiagnosisResult, diagnosisQuestionCount + 1)
+        setIsDiagnosisComplete(shouldStop)
 
         setIsTyping(false)
 
@@ -382,8 +440,18 @@ export default function ChatbotPage() {
           displayConditionsUpdate(nextDiagnosisResult.conditions)
         }
 
-        if (nextDiagnosisResult.should_stop) {
-          displayFinalDiagnosis(nextDiagnosisResult.conditions)
+        if (shouldStop) {
+          if (showMaxQuestionsChoice) {
+            // Show choice message instead of ending diagnosis
+            const choiceMessage = {
+              type: "max_questions_choice",
+              questionCount: diagnosisQuestionCount + 1,
+              conditions: nextDiagnosisResult.conditions || []
+            }
+            addBotMessage(choiceMessage as any)
+          } else {
+            displayFinalDiagnosis(nextDiagnosisResult.conditions)
+          }
         } else if (nextDiagnosisResult.question) {
           setTimeout(() => {
             addBotMessage(nextDiagnosisResult.question)
@@ -476,6 +544,13 @@ export default function ChatbotPage() {
           addBotMessage(questions[currentStep + 1].question)
         }, 1000)
         return
+      } else if (currentFixedQuestion.id === "location") {
+        setUserLocation(value)
+        setCurrentStep(currentStep + 1)
+        setTimeout(() => {
+          addBotMessage(questions[currentStep + 1].question)
+        }, 1000)
+        return
       } else if (currentFixedQuestion.id === "symptoms") {
         if (value.length < 10) {
           addBotMessage("Please provide a more detailed description of your symptoms (at least 10 characters).")
@@ -486,7 +561,10 @@ export default function ChatbotPage() {
           addBotMessage("Thank you for sharing your symptoms. Let me analyze them...")
           setIsTyping(true)
 
-          const result = await getParseResult(value)
+          const normalizedInput = normalizeText(value)
+          console.log("Normalized Input:", normalizedInput);
+          console.log("Using UserAge:", userAge);
+          const result = await getParseResult(normalizedInput)
           if (!result || !Array.isArray(result.mentions)) {
             throw new Error("Received an invalid response format for symptom analysis. Please try again.")
           }
@@ -494,7 +572,15 @@ export default function ChatbotPage() {
           const initialEvidence: EvidenceItem[] = result.mentions.map((mention: any) => ({
             id: mention.id,
             choice_id: mention.choice_id,
+            source: "initial"
           }))
+
+          // Add geographic risk factors based on user location
+          const geographicEvidence = getGeographicRiskFactors(userLocation)
+          const allInitialEvidence = [...initialEvidence, ...geographicEvidence]
+
+          console.log(`Created ${initialEvidence.length} initial evidence items from symptoms:`, initialEvidence)
+          console.log(`Added ${geographicEvidence.length} geographic risk factors:`, geographicEvidence)
 
           if (initialEvidence.length === 0) {
             addBotMessage(
@@ -504,8 +590,8 @@ export default function ChatbotPage() {
             return
           }
 
-          setEvidence(initialEvidence)
-          const diagnosis = await getDiagnosis(initialEvidence)
+          setEvidence(allInitialEvidence)
+          const diagnosis = await getDiagnosis(allInitialEvidence)
 
           if (!diagnosis) {
             throw new Error("No diagnosis data received from the API.")
@@ -553,74 +639,303 @@ export default function ChatbotPage() {
     addBotMessage("An unexpected state occurred. Please try again or refresh the page.")
   }
 
-  // API calls
-  const getDiagnosis = async (currentEvidence: EvidenceItem[]) => {
-    if (userAge === null || userSex === null || currentEvidence.length === 0) {
-      throw new Error("Diagnosis prerequisites are missing (age, sex, or initial evidence).")
+  // Function to identify emergency symptoms from evidence and conditions
+  const identifyEmergencySymptoms = (diagnosisResult: DiagnosisResponse, currentEvidence: EvidenceItem[]): string[] => {
+    const emergencyKeywords = [
+      'severe chest pain', 'difficulty breathing', 'loss of consciousness', 'severe headache',
+      'stroke symptoms', 'heart attack', 'severe bleeding', 'poisoning', 'severe burns',
+      'severe allergic reaction', 'suicidal thoughts', 'severe abdominal pain',
+      'difficulty swallowing', 'severe shortness of breath', 'chest tightness',
+      'cardiac arrest', 'respiratory distress', 'anaphylaxis', 'seizure'
+    ]
+    
+    const detectedEmergencies: string[] = []
+    
+    // Check API emergency flag
+    if ((diagnosisResult as any).has_emergency_evidence) {
+      detectedEmergencies.push('Emergency evidence detected by medical AI')
+    }
+    
+    // Check conditions for emergency indicators
+    if (diagnosisResult.conditions) {
+      diagnosisResult.conditions.forEach(condition => {
+        const conditionName = (condition.common_name || condition.name).toLowerCase()
+        const description = condition.details?.description?.toLowerCase() || ''
+        
+        // Check for emergency conditions
+        if (condition.details?.acuteness === 'chronic_with_exacerbation' || 
+            condition.details?.acuteness === 'acute' ||
+            condition.details?.severity === 'high') {
+          
+          emergencyKeywords.forEach(keyword => {
+            if (conditionName.includes(keyword) || description.includes(keyword)) {
+              detectedEmergencies.push(`${condition.common_name || condition.name} (${keyword})`)
+            }
+          })
+        }
+      })
+    }
+    
+    return [...new Set(detectedEmergencies)] // Remove duplicates
+  }
+
+  // Smart stop logic function
+  const smartStopLogic = (diagnosisResult: DiagnosisResponse, currentQuestionCount: number): boolean => {
+    const conditions = diagnosisResult.conditions || []
+    const apiShouldStop = diagnosisResult.should_stop
+    
+    console.log("Smart Stop Analysis:", {
+      questionCount: currentQuestionCount,
+      apiShouldStop,
+      conditionsCount: conditions.length,
+      topProbability: conditions[0]?.probability || 0,
+      hasQuestion: !!diagnosisResult.question
+    })
+
+    // EMERGENCY DETECTION: Collect emergency symptoms but continue diagnosis
+    const detectedEmergencies = identifyEmergencySymptoms(diagnosisResult, evidence)
+    if (detectedEmergencies.length > 0) {
+      console.log("🚨 EMERGENCY SYMPTOMS DETECTED:", detectedEmergencies)
+      setEmergencySymptoms(prev => {
+        const combined = [...prev, ...detectedEmergencies]
+        return [...new Set(combined)] // Remove duplicates
+      })
+      // Don't stop - continue with diagnosis to gather more information
     }
 
-    if (!interviewId) {
-      throw new Error("An internal error occurred: Interview ID missing.")
-    }
-
-    const uniqueEvidenceMap = new Map<string, EvidenceItem>()
-    for (const item of currentEvidence) {
-      if (!uniqueEvidenceMap.has(item.id)) {
-        uniqueEvidenceMap.set(item.id, item)
+    // HIGH CONFIDENCE STOP: If we have a very confident diagnosis
+    if (conditions.length > 0) {
+      const topCondition = conditions[0]
+      const secondCondition = conditions[1]
+      
+      // Stop if top condition has very high probability (>85%)
+      if (topCondition.probability > 0.85) {
+        console.log("🎯 HIGH CONFIDENCE STOP: Top condition >85%", topCondition.probability)
+        return true
+      }
+      
+      // Stop if top condition is significantly higher than second (gap >40%)
+      if (secondCondition && (topCondition.probability - secondCondition.probability) > 0.4) {
+        console.log("📊 CLEAR LEADER STOP: Large gap between top conditions")
+        return true
+      }
+      
+      // Stop if we have good confidence (>70%) AND API suggests stopping
+      if (topCondition.probability > 0.7 && apiShouldStop) {
+        console.log("✅ GOOD CONFIDENCE + API STOP")
+        return true
       }
     }
-    const dedupedEvidence = Array.from(uniqueEvidenceMap.values())
 
-    const payload = {
-      age: { value: userAge, unit: "year" },
-      sex: userSex,
-      evidence: dedupedEvidence,
+    // MINIMUM QUESTIONS: Don't stop before asking at least 3 questions (unless emergency)
+    if (currentQuestionCount < 3) {
+      console.log("🔄 CONTINUE: Need minimum 3 questions")
+      return false
     }
 
-    try {
-      const res = await fetch("http://localhost:5001/api/infermedica/diagnosis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Interview-Id": interviewId },
-        body: JSON.stringify(payload),
-      })
-      return await parseJsonResponse(res)
-    } catch (error) {
-      console.error("API call to /diagnosis failed:", error)
-      throw error
+    // API GUIDANCE: Trust API if it strongly suggests stopping after minimum questions
+    if (apiShouldStop && currentQuestionCount >= 5) {
+      console.log("🤖 API GUIDANCE STOP: API suggests stopping after sufficient questions")
+      return true
+    }
+
+    // QUESTION AVAILABILITY: If no more questions available, stop
+    if (!diagnosisResult.question) {
+      console.log("❓ NO MORE QUESTIONS: Stopping due to lack of questions")
+      return true
+    }
+
+    // MAXIMUM QUESTIONS: Show choice to user instead of hard stop
+    if (currentQuestionCount >= MAX_DIAGNOSIS_QUESTIONS && !continuePastMaxQuestions) {
+      console.log("🔚 MAX QUESTIONS REACHED: Showing user choice")
+      setShowMaxQuestionsChoice(true)
+      return true // Temporarily stop to show choice
+    }
+
+    // EXTENDED MAXIMUM: Hard limit for continued diagnosis (50% higher than original)
+    if (continuePastMaxQuestions && currentQuestionCount >= Math.floor(MAX_DIAGNOSIS_QUESTIONS * 1.5)) {
+      console.log("🛑 EXTENDED MAX REACHED: Final hard stop")
+      return true
+    }
+
+    // CONVERGENCE CHECK: If probabilities haven't changed much in recent questions
+    if (currentQuestionCount >= 6 && conditions.length > 0) {
+      const topProbability = conditions[0].probability
+      // This could be enhanced to track probability changes over time
+      if (topProbability > 0.6) {
+        console.log("📈 CONVERGENCE STOP: Stable probabilities with good confidence")
+        return true
+      }
+    }
+
+    console.log("➡️ CONTINUE: No stop conditions met")
+    return false
+  }
+
+  // Handle user choice when max questions are reached
+  const handleEndDiagnosis = () => {
+    setShowMaxQuestionsChoice(false)
+    setIsDiagnosisComplete(true)
+    displayFinalDiagnosis(currDiagnosisConditions)
+  }
+
+  const handleContinueDiagnosis = async () => {
+    setShowMaxQuestionsChoice(false)
+    setContinuePastMaxQuestions(true)
+    
+    // Continue with current evidence and show the next question
+    if (currDiagnosisQuestions) {
+      addBotMessage("Continuing with more detailed questions to improve accuracy...")
+      setTimeout(() => {
+        addBotMessage(currDiagnosisQuestions)
+      }, 1500)
+    } else {
+      // If no current question, try to get the next one
+      await proceedWithDiagnosis(evidence)
     }
   }
+
+  // API calls
+const getDiagnosis = async (currentEvidence: EvidenceItem[]) => {
+  if (userAge === null || userSex === null || currentEvidence.length === 0) {
+    throw new Error("Diagnosis prerequisites are missing (age, sex, or initial evidence).")
+  }
+
+  if (!interviewId) {
+    throw new Error("Interview ID is missing.")
+  }
+
+  // Deduplicate evidence
+  const uniqueEvidenceMap = new Map<string, EvidenceItem>()
+  currentEvidence.forEach(item => {
+    if (!uniqueEvidenceMap.has(item.id)) {
+      uniqueEvidenceMap.set(item.id, item)
+    }
+  })
+  const dedupedEvidence = Array.from(uniqueEvidenceMap.values())
+
+  // Ensure all evidence has proper source according to Infermedica API
+  const normalizedEvidence = dedupedEvidence.map(item => ({
+    ...item,
+    // Keep existing source if present, otherwise omit for dynamic interview evidence
+    ...(item.source && { source: item.source })
+  }))
+
+  console.log(`Sending diagnosis with ${normalizedEvidence.length} evidence items:`, {
+    initialEvidence: normalizedEvidence.filter(e => e.source === "initial").length,
+    dynamicEvidence: normalizedEvidence.filter(e => !e.source).length,
+    otherSources: normalizedEvidence.filter(e => e.source && e.source !== "initial").length
+  })
+
+  const payload = {
+    age: { value: userAge, unit: "year" },
+    sex: userSex,
+    evidence: normalizedEvidence,
+    evaluated_at: new Date().toISOString().split("T")[0],  // Optional but helps timeline logic
+    extras: {
+      enable_triage_advanced_mode: true,
+      enable_conditions_details: true,
+      enable_evidence_details: true
+    }
+  }
+
+  try {
+    const res = await fetch("http://localhost:5001/api/infermedica/diagnosis", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Interview-Id": interviewId
+      },
+      body: JSON.stringify(payload),
+    })
+    return await parseJsonResponse(res)
+  } catch (error) {
+    console.error("Diagnosis API call failed:", error)
+    throw error
+  }
+}
+
 
   const getParseResult = async (responseString: string) => {
     if (userAge === null || userSex === null) {
       throw new Error("Parsing prerequisites are missing (age or sex).")
     }
 
-    if (!interviewId) {
-      throw new Error("An internal error occurred: Interview ID missing for parsing.")
-    }
+    const finalInterviewId = interviewId || uuidv4()
+
+    console.log("Using User Age:", userAge)
 
     const payload = {
-      age: { value: userAge, unit: "year" },
+      "age.value": userAge,
+      "age.unit": "year",
       sex: userSex,
       text: responseString,
-      context: [],
-      include_tokens: true,
+      context: [], // can populate this from previous input (optional)
+      include_tokens: true, // Set to true to get better parsing details
       correct_spelling: true,
-      concept_types: ["symptom"],
-      interviewId: interviewId,
+      concept_types: ["symptom", "risk_factor"], // capture more context
+      interviewId: finalInterviewId,
     }
 
     try {
       const res = await fetch("http://localhost:5001/api/infermedica/parse", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Interview-Id": interviewId },
+        headers: {
+          "Content-Type": "application/json",
+          "Interview-Id": finalInterviewId,
+        },
         body: JSON.stringify(payload),
       })
-      return await parseJsonResponse(res)
+
+      const data = await parseJsonResponse(res)
+
+      // Filter out low-relevance mentions to improve quality
+      if (data.mentions) {
+        data.mentions = data.mentions.filter((m: any) => {
+          // Keep mentions with higher relevance or confidence
+          return m.relevance ? m.relevance > 0.4 : true
+        })
+      }
+
+      return data
     } catch (error) {
       console.error("API call to /parse failed:", error)
       throw error
     }
+  }
+
+  // Geographic risk factors mapping based on Infermedica documentation
+  const getGeographicRiskFactors = (location: string | null): EvidenceItem[] => {
+    if (!location || location === "No recent travel") return []
+    
+    const riskFactors: EvidenceItem[] = []
+    
+    switch (location) {
+      case "United States/Canada":
+        riskFactors.push({ id: "p_13", choice_id: "present", source: "predefined" })
+        break
+      case "Europe":
+        riskFactors.push({ id: "p_15", choice_id: "present", source: "predefined" })
+        break
+      case "Asia":
+        riskFactors.push({ id: "p_236", choice_id: "present", source: "predefined" })
+        break
+      case "Africa":
+        // Using Central Africa as default, could be refined further
+        riskFactors.push({ id: "p_17", choice_id: "present", source: "predefined" })
+        break
+      case "South America":
+        riskFactors.push({ id: "p_14", choice_id: "present", source: "predefined" })
+        break
+      case "Australia/Oceania":
+        riskFactors.push({ id: "p_19", choice_id: "present", source: "predefined" })
+        break
+      case "Middle East":
+        riskFactors.push({ id: "p_21", choice_id: "present", source: "predefined" })
+        break
+    }
+    
+    return riskFactors
   }
 
   async function askGemini(prompt: string) {
@@ -639,9 +954,19 @@ export default function ChatbotPage() {
     const finalDiagnosisContent = {
       type: "final_diagnosis",
       conditions: conditions || [],
+      emergencySymptoms: emergencySymptoms,
     }
 
     addBotMessage(finalDiagnosisContent as any)
+
+    // Show emergency warning if any emergency symptoms were detected
+    if (emergencySymptoms.length > 0) {
+      const emergencyMessage = `⚠️ **URGENT MEDICAL ATTENTION REQUIRED**\n\nThe following emergency indicators were detected during your assessment:\n\n${emergencySymptoms.map(symptom => `• ${symptom}`).join('\n')}\n\n🚨 **Please contact emergency services (911) or visit the nearest emergency room immediately!** 🚨\n\nDo not delay seeking medical attention. These symptoms may indicate serious medical conditions that require immediate professional care.`
+      
+      setTimeout(() => {
+        addBotMessage(emergencyMessage)
+      }, 1000)
+    }
 
     // If there is a top condition, ask Gemini for more info and treatment
     if (conditions && conditions.length > 0) {
@@ -654,9 +979,12 @@ export default function ChatbotPage() {
 
       // Ask Gemini and display the response
       const geminiResponse = await askGemini(geminiPrompt)
-      addBotMessage(
-        `**More information about ${topCondition.common_name || topCondition.name}:**\n\n${geminiResponse}`,
-      )
+      const delay = emergencySymptoms.length > 0 ? 3000 : 1500 // Longer delay if emergency message shown
+      setTimeout(() => {
+        addBotMessage(
+          `**More information about ${topCondition.common_name || topCondition.name}:**\n\n${geminiResponse}`,
+        )
+      }, delay)
     }
   }
 
@@ -763,7 +1091,7 @@ export default function ChatbotPage() {
                             }
                           })}
                         </div>
-                      ) : message.content.type === "final_diagnosis" ? (
+                      ) : (typeof message.content === "object" && (message.content as any).type === "final_diagnosis") ? (
                         // Enhanced Final Diagnosis Display
                         <div className="space-y-6">
                           <div className="text-center">
@@ -776,7 +1104,36 @@ export default function ChatbotPage() {
                             <p className="text-gray-600 dark:text-gray-400">Based on your symptoms and responses</p>
                           </div>
 
-                          {message.content.conditions && message.content.conditions.length > 0 ? (
+                          {/* Emergency Symptoms Warning */}
+                          {"emergencySymptoms" in message.content && Array.isArray((message.content as any).emergencySymptoms) && (message.content as any).emergencySymptoms.length > 0 && (
+                            <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 border-2 border-red-500 dark:border-red-400">
+                              <div className="flex items-start space-x-3">
+                                <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                                <div className="flex-1">
+                                  <h3 className="font-bold text-red-900 dark:text-red-100 mb-3 text-lg">
+                                    🚨 URGENT: Emergency Symptoms Detected
+                                  </h3>
+                                  <div className="space-y-2 mb-4">
+                                    {(message.content as any).emergencySymptoms.map((symptom: string, index: number) => (
+                                      <div key={index} className="flex items-start space-x-2">
+                                        <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
+                                        <p className="text-sm text-red-800 dark:text-red-200 font-medium">
+                                          {symptom}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="bg-red-100 dark:bg-red-900/40 rounded-lg p-3 border border-red-300 dark:border-red-700">
+                                    <p className="text-sm text-red-900 dark:text-red-100 font-bold text-center">
+                                      ⚠️ Please contact emergency services (911) or visit the nearest emergency room immediately! ⚠️
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {"conditions" in message.content && Array.isArray((message.content as any).conditions) && (message.content as any).conditions.length > 0 ? (
                             <div className="space-y-4">
                               <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
                                 <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-3 flex items-center">
@@ -784,7 +1141,7 @@ export default function ChatbotPage() {
                                   Most Likely Conditions
                                 </h3>
                                 <div className="space-y-3">
-                                  {message.content.conditions
+                                  {(message.content as { conditions: Condition[] }).conditions
                                     .sort((a: Condition, b: Condition) => b.probability - a.probability)
                                     .slice(0, 3)
                                     .map((condition: Condition, index: number) => {
@@ -805,16 +1162,43 @@ export default function ChatbotPage() {
                                       return (
                                         <div
                                           key={condition.id}
-                                          className={`${bgColor} rounded-lg p-3 flex items-center justify-between`}
+                                          className={`${bgColor} rounded-lg p-3`}
                                         >
-                                          <div>
-                                            <p className={`font-medium ${textColor}`}>
-                                              {condition.common_name || condition.name}
+                                          <div className="flex items-center justify-between mb-2">
+                                            <div className="flex-1">
+                                              <p className={`font-medium ${textColor}`}>
+                                                {condition.common_name || condition.name}
+                                              </p>
+                                              {condition.details?.severity && (
+                                                <p className={`text-xs ${textColor} opacity-75 mt-1`}>
+                                                  Severity: {condition.details.severity.charAt(0).toUpperCase() + condition.details.severity.slice(1)}
+                                                </p>
+                                              )}
+                                              {condition.details?.acuteness && (
+                                                <p className={`text-xs ${textColor} opacity-75 mt-1`}>
+                                                  Acuteness: {condition.details.acuteness.charAt(0).toUpperCase() + condition.details.acuteness.slice(1)}
+                                                </p>
+                                              )}
+                                              {condition.details?.prevalence && (
+                                                <p className={`text-xs ${textColor} opacity-75 mt-1`}>
+                                                  Prevalence: {condition.details.prevalence.charAt(0).toUpperCase() + condition.details.prevalence.slice(1)}
+                                                </p>
+                                              )}
+                                            </div>
+                                            <div className={`text-right ${textColor}`}>
+                                              <p className="text-lg font-bold">{percentage}%</p>
+                                            </div>
+                                          </div>
+                                          {condition.details?.description && (
+                                            <p className={`text-xs ${textColor} opacity-80 mt-2 leading-relaxed`}>
+                                              {condition.details.description}
                                             </p>
-                                          </div>
-                                          <div className={`text-right ${textColor}`}>
-                                            <p className="text-lg font-bold">{percentage}%</p>
-                                          </div>
+                                          )}
+                                          {condition.details?.icd10 && (
+                                            <p className={`text-xs ${textColor} opacity-60 mt-1`}>
+                                              ICD-10: {condition.details.icd10}
+                                            </p>
+                                          )}
                                         </div>
                                       )
                                     })}
@@ -869,6 +1253,92 @@ export default function ChatbotPage() {
                               </p>
                             </div>
                           )}
+                        </div>
+                      ) : (typeof message.content === "object" && (message.content as any).type === "max_questions_choice") ? (
+                        // Max Questions Choice Display
+                        <div className="space-y-6">
+                          <div className="text-center">
+                            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-full mb-4">
+                              <AlertTriangle className="h-8 w-8 text-white" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                              Maximum Questions Reached
+                            </h2>
+                            <p className="text-gray-600 dark:text-gray-400">
+                              We've asked {(message.content as any).questionCount} questions. What would you like to do?
+                            </p>
+                          </div>
+
+                          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                            <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-3 flex items-center">
+                              <TrendingUp className="h-5 w-5 mr-2" />
+                              Current Assessment
+                            </h3>
+                            {(message.content as any).conditions && (message.content as any).conditions.length > 0 ? (
+                              <div className="space-y-2">
+                                {(message.content as any).conditions.slice(0, 3).map((condition: any, index: number) => {
+                                  const percentage = (condition.probability * 100).toFixed(1)
+                                  const emoji = index === 0 ? "🔴" : index === 1 ? "🟡" : "🟢"
+                                  return (
+                                    <div key={condition.id} className="flex justify-between items-center">
+                                      <span className="text-sm text-blue-800 dark:text-blue-200">
+                                        {emoji} {condition.common_name || condition.name}
+                                      </span>
+                                      <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                        {percentage}%
+                                      </span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-blue-800 dark:text-blue-200">
+                                No specific conditions identified yet.
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="space-y-4">
+                            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
+                              <div className="flex items-start space-x-3">
+                                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                                <div>
+                                  <h4 className="font-semibold text-green-900 dark:text-green-100 mb-2">
+                                    End Diagnosis Now
+                                  </h4>
+                                  <p className="text-sm text-green-800 dark:text-green-200 leading-relaxed mb-3">
+                                    Get results based on current information. Good choice if you have a clear leading condition.
+                                  </p>
+                                  <button
+                                    onClick={handleEndDiagnosis}
+                                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium"
+                                  >
+                                    End Diagnosis
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                              <div className="flex items-start space-x-3">
+                                <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                                <div>
+                                  <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                                    Continue for Better Accuracy
+                                  </h4>
+                                  <p className="text-sm text-blue-800 dark:text-blue-200 leading-relaxed mb-3">
+                                    Ask more questions to improve diagnosis accuracy. Will continue until we reach high confidence (85%+) or API recommends stopping.
+                                  </p>
+                                  <button
+                                    onClick={handleContinueDiagnosis}
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+                                  >
+                                    Continue Diagnosis
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       ) : (
                         // Regular Infermedica Question Display
@@ -1084,6 +1554,7 @@ export default function ChatbotPage() {
                     // Reset all states for a new assessment
                     setUserAge(null)
                     setUserSex(null)
+                    setUserLocation(null)
                     setMessages([])
                     setCurrentInput("")
                     setCurrentStep(0)
@@ -1098,6 +1569,9 @@ export default function ChatbotPage() {
                     setIsDiagnosisComplete(false)
                     setTempGroupedSelections({})
                     setDiagnosisQuestionCount(0)
+                    setShowMaxQuestionsChoice(false)
+                    setContinuePastMaxQuestions(false)
+                    setEmergencySymptoms([])
 
                     // Restart the conversation flow
                     setTimeout(() => {
@@ -1203,4 +1677,62 @@ export default function ChatbotPage() {
       <Footer />
     </div>
   )
+}
+
+// Speech Recognition Interfaces
+interface SpeechRecognitionEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+  readonly message: string;
+}
+
+interface SpeechGrammarList {
+  addFromString(grammar: string, weight?: number): void;
+  addFromURI(uri: string, weight?: number): void;
+  length: number;
+  [index: number]: SpeechGrammar;
+}
+
+interface SpeechGrammar {
+  src: string;
+  weight: number;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  grammars: SpeechGrammarList;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  serviceURI: string;
+  
+  onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => any) | null;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
+  
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+declare var SpeechRecognition: {
+  prototype: SpeechRecognition;
+  new(): SpeechRecognition;
+};
+
+declare var webkitSpeechRecognition: {
+  prototype: SpeechRecognition;
+  new(): SpeechRecognition;
+};
+
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof webkitSpeechRecognition;
+  }
 }
