@@ -5,7 +5,12 @@ const router = express.Router();
 
 router.post("/gemini", async (req, res) => {
   try {
-    const apiKey = "AIzaSyBAwJRLD1a-Ls6G3_trhySonty3zNOXepw"; // Store your key in .env
+    const apiKey = process.env.GEMINI_API_KEY; // Load from environment variables
+    
+    if (!apiKey) {
+      return res.status(500).json({ error: "Gemini API key is not configured" });
+    }
+    
     const prompt = req.body.prompt;
 
     const response = await axios.post(

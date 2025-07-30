@@ -1,28 +1,71 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# Dependencies
 node_modules/
-/node_modules
-
-# next.js
-.next/
-/out/
-
-# production
-/build
-
-# debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
-.env*
+# Frontend (Next.js)
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/next-env.d.ts
+frontend/*.tsbuildinfo
 
-# vercel
+# Backend (Express)
+backend/dist/
+backend/build/
+backend/uploads/
+backend/logs/
+backend/*.log
+backend/pids/
+backend/*.pid
+backend/*.seed
+backend/*.pid.lock
+backend/coverage/
+
+# Environment variables (ALL)
+.env*
+!.env.example
+
+# Production builds
+/build
+/dist
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Vercel deployment
 .vercel
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
