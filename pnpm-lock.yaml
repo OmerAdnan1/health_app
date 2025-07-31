@@ -161,9 +161,6 @@ importers:
       recharts:
         specifier: latest
         version: 3.1.0(@types/react@19.1.9)(react-dom@19.0.0(react@19.0.0))(react-is@19.1.1)(react@19.0.0)(redux@5.0.1)
-      some-module:
-        specifier: latest
-        version: 0.0.3
       sonner:
         specifier: latest
         version: 2.0.6(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -1826,10 +1823,6 @@ packages:
 
   simple-swizzle@0.2.2:
     resolution: {integrity: sha512-JA//kQgZtbuY83m+xT+tXJkmJncGMTFT+C+g2h2R9uxkYIrE2yy9sgmcLhCnw57/WSD+Eh3J97FPEDFnbXnDUg==}
-
-  some-module@0.0.3:
-    resolution: {integrity: sha512-Ek6uk9umSl84zS9J7gmh9Ub0soPuq87/IyOqyRT+iecSO3af8oJpO+N0kO4/nHKCBeFEMm04iEIPolIfWXCzpA==}
-    deprecated: Module turned out to be not as useful as might have been expected
 
   sonner@2.0.6:
     resolution: {integrity: sha512-yHFhk8T/DK3YxjFQXIrcHT1rGEeTLliVzWbO0xN8GberVun2RiBnxAjXAYpZrqwEVHBG9asI/Li8TAAhN9m59Q==}
@@ -3663,8 +3656,6 @@ snapshots:
     dependencies:
       is-arrayish: 0.3.2
     optional: true
-
-  some-module@0.0.3: {}
 
   sonner@2.0.6(react-dom@19.0.0(react@19.0.0))(react@19.0.0):
     dependencies:

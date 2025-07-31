@@ -1,8 +1,14 @@
 "use client"
 
-// Custom React hooks for HealthBuddy API
 import { useState, useCallback } from "react"
-import { healthAPI, type EvidenceItem, type DiagnosisResponse, type ParseResponse, APIError } from "../api"
+import {
+  getDiagnosis,
+  getParseResult,
+  askGemini,
+  getGeographicRiskFactors,
+  type EvidenceItem,
+  type DiagnosisResponse,
+} from "../api/healthAPI"
 
 // Hook for symptom parsing
 export const useSymptomParser = () => {
@@ -11,21 +17,21 @@ export const useSymptomParser = () => {
 
   const parseSymptoms = useCallback(
     async (
-      text: string,
-      age: number,
-      sex: "male" | "female" | "other",
-      interviewId?: string,
-    ): Promise<ParseResponse | null> => {
+      symptoms: string,
+      userAge: number | null,
+      userSex: "male" | "female" | "other" | null,
+      interviewId: string | null,
+    ) => {
       setIsLoading(true)
       setError(null)
 
       try {
-        const result = await healthAPI.parseSymptoms(text, age, sex, interviewId)
+        const result = await getParseResult(symptoms, userAge, userSex, interviewId)
         return result
       } catch (err) {
-        const errorMessage = err instanceof APIError ? err.message : "Failed to parse symptoms"
+        const errorMessage = err instanceof Error ? err.message : "Failed to parse symptoms"
         setError(errorMessage)
-        return null
+        throw err
       } finally {
         setIsLoading(false)
       }
@@ -41,23 +47,23 @@ export const useDiagnosis = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const getDiagnosis = useCallback(
+  const diagnose = useCallback(
     async (
       evidence: EvidenceItem[],
-      age: number,
-      sex: "male" | "female" | "other",
-      interviewId: string,
-    ): Promise<DiagnosisResponse | null> => {
+      userAge: number | null,
+      userSex: "male" | "female" | "other" | null,
+      interviewId: string | null,
+    ): Promise<DiagnosisResponse> => {
       setIsLoading(true)
       setError(null)
 
       try {
-        const result = await healthAPI.getDiagnosis(evidence, age, sex, interviewId)
+        const result = await getDiagnosis(evidence, userAge, userSex, interviewId)
         return result
       } catch (err) {
-        const errorMessage = err instanceof APIError ? err.message : "Failed to get diagnosis"
+        const errorMessage = err instanceof Error ? err.message : "Failed to get diagnosis"
         setError(errorMessage)
-        return null
+        throw err
       } finally {
         setIsLoading(false)
       }
@@ -65,7 +71,7 @@ export const useDiagnosis = () => {
     [],
   )
 
-  return { getDiagnosis, isLoading, error }
+  return { diagnose, isLoading, error }
 }
 
 // Hook for Gemini AI
@@ -73,89 +79,40 @@ export const useGeminiAI = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const askGemini = useCallback(async (prompt: string): Promise<string | null> => {
+  const askAI = useCallback(async (prompt: string): Promise<string> => {
     setIsLoading(true)
     setError(null)
 
     try {
-      const result = await healthAPI.askGemini(prompt)
+      const result = await askGemini(prompt)
       return result
     } catch (err) {
-      const errorMessage = err instanceof APIError ? err.message : "Failed to get AI response"
+      const errorMessage = err instanceof Error ? err.message : "Failed to get AI response"
       setError(errorMessage)
-      return null
+      throw err
     } finally {
       setIsLoading(false)
     }
   }, [])
 
-  return { askGemini, isLoading, error }
-}
-
-// Hook for health assessments management
-export const useHealthAssessments = () => {
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const saveAssessment = useCallback(async (assessmentData: any) => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const result = await healthAPI.saveHealthAssessment(assessmentData)
-      return result
-    } catch (err) {
-      const errorMessage = err instanceof APIError ? err.message : "Failed to save assessment"
-      setError(errorMessage)
-      return null
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  const getAssessments = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const result = await healthAPI.getHealthAssessments()
-      return result
-    } catch (err) {
-      const errorMessage = err instanceof APIError ? err.message : "Failed to get assessments"
-      setError(errorMessage)
-      return []
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  return { saveAssessment, getAssessments, isLoading, error }
+  return { askAI, isLoading, error }
 }
 
 // Combined hook for complete health workflow
 export const useHealthWorkflow = () => {
-  const { parseSymptoms, isLoading: isParsingSymptoms, error: parseError } = useSymptomParser()
-  const { getDiagnosis, isLoading: isDiagnosing, error: diagnosisError } = useDiagnosis()
-  const { askGemini, isLoading: isAskingGemini, error: geminiError } = useGeminiAI()
-  const { saveAssessment, getAssessments, isLoading: isManagingData, error: dataError } = useHealthAssessments()
+  const { parseSymptoms, isLoading: isParsingLoading, error: parseError } = useSymptomParser()
+  const { diagnose, isLoading: isDiagnosisLoading, error: diagnosisError } = useDiagnosis()
+  const { askAI, isLoading: isAILoading, error: aiError } = useGeminiAI()
 
-  const isLoading = isParsingSymptoms || isDiagnosing || isAskingGemini || isManagingData
-  const error = parseError || diagnosisError || geminiError || dataError
+  const isLoading = isParsingLoading || isDiagnosisLoading || isAILoading
+  const error = parseError || diagnosisError || aiError
 
   return {
-    // Methods
     parseSymptoms,
-    getDiagnosis,
-    askGemini,
-    saveAssessment,
-    getAssessments,
-    // State
+    diagnose,
+    askAI,
+    getGeographicRiskFactors,
     isLoading,
     error,
-    // Individual loading states
-    isParsingSymptoms,
-    isDiagnosing,
-    isAskingGemini,
-    isManagingData,
   }
 }
