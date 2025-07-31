@@ -4,7 +4,7 @@ A comprehensive health monitoring and diagnosis application with AI-powered chat
 
 ## Project Structure
 
-```
+\`\`\`
 health_app/
 ├── backend/           # Express.js API server
 │   ├── src/
@@ -25,7 +25,7 @@ health_app/
 │   ├── components/    # React components
 │   └── package.json
 └── package.json       # Root workspace configuration
-```
+\`\`\`
 
 ## Features
 
@@ -44,27 +44,27 @@ health_app/
 ### Installation
 
 1. Clone the repository
-```bash
+\`\`\`bash
 git clone <repository-url>
 cd health_app
-```
+\`\`\`
 
 2. Install dependencies for both frontend and backend
-```bash
+\`\`\`bash
 npm run install:all
-```
+\`\`\`
 
 3. Set up environment variables
-```bash
+\`\`\`bash
 # In backend/ directory, create .env file:
 cp backend/.env.example backend/.env
 # Add your API keys for Infermedica and Gemini
-```
+\`\`\`
 
 4. Start development servers
-```bash
+\`\`\`bash
 npm run dev
-```
+\`\`\`
 
 This will start:
 - Backend server on http://localhost:5000
@@ -72,7 +72,7 @@ This will start:
 
 ### Individual Commands
 
-```bash
+\`\`\`bash
 # Frontend only
 npm run dev:frontend
 
@@ -84,7 +84,7 @@ npm run build
 
 # Start production
 npm run start
-```
+\`\`\`
 
 ## API Keys Required
 
