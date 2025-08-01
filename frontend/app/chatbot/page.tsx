@@ -597,8 +597,10 @@ export default function ChatbotPage() {
             displayFinalDiagnosis(diagnosis.conditions)
           } else if (diagnosis.question) {
             setTimeout(() => {
-              addBotMessage(diagnosis.question)
-            }, 2000)
+                          if (diagnosis.question) {
+                            addBotMessage(diagnosis.question!)
+                          }
+                        }, 2000)
           } else {
             addBotMessage(
               "The diagnosis process encountered an unexpected state. Please consult a healthcare professional.",
