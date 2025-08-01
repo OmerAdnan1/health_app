@@ -184,6 +184,107 @@ router.get('/symptoms', async (req: Request, res: Response) => {
 });
 
 // 5. Infermedica /Triage endpoint
+router.post('/triage', async (req: Request, res: Response) => {
+  try {
+    const { age, sex, symptoms, interviewId } = req.body;
+
+    console.log("Received Triage Request:", {
+      age,
+      sex,
+      symptomsCount: symptoms?.length || 0
+    });
+
+    if (!age || !sex || !symptoms) {
+      return res.status(400).json({ error: 'Age, sex, and symptoms are required for triage.' });
+    }
+
+    // Prepare the payload for Infermedica
+    const triagePayload = {
+      age,
+      sex,
+      symptoms,
+      extras: {
+          enable_explanations: true,
+          enable_evidence_details: true,
+          enable_conditions_details: true,
+          enable_triage_advanced_mode: true,
+          include_condition_ranking: true,
+          enable_symptom_duration: true,
+          enable_red_flags: true,
+          enable_prevalence: true,
+          enable_severity: true
+      }
+    };
+
+    console.log("Sending to Infermedica Triage API:", triagePayload);
+    
+    const response = await axios.post(`${INFERMEDICA_BASE_URL}/triage`, 
+      triagePayload,
+      {
+        headers: getInfermedicaHeaders(interviewId as string)
+      }
+    );
+
+    console.log("Infermedica Triage Response received");
+    console.log("Response Data:", response.data);
+
+    res.json(response.data);
+  } catch (error: any) {
+    console.error('Error proxying /triage:', error.message);
+    if (error.response) {
+      console.error('Infermedica Error Response:', error.response.data);
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// 6. Infermedica /explain endpoint
+router.post('/explain', async (req: Request, res: Response) => {
+  try {
+    const { age, sex, evidence, condition_id, interviewId } = req.body;
+
+    console.log("Received Explain Request:", {
+      age,
+      sex,
+      evidenceCount: evidence?.length || 0,
+      targetCondition: condition_id
+    });
+
+    if (!age || !sex || !evidence || !condition_id) {
+      return res.status(400).json({ error: 'Age, sex, evidence, and condition_id are required for explanation.' });
+    }
+
+    const explainPayload = {
+      sex,
+      age,
+      evidence,
+      target: condition_id
+    };
+
+    console.log("Sending to Infermedica Explain API:", explainPayload);
+
+    const response = await axios.post(
+      `${INFERMEDICA_BASE_URL}/explain`,
+      explainPayload,
+      {
+        headers: getInfermedicaHeaders(interviewId as string)
+      }
+    );
+
+    console.log("Infermedica Explain Response received");
+    console.log("Response Data:", response.data);
+
+    res.json(response.data);
+  } catch (error: any) {
+    console.error('Error proxying /explain:', error.message);
+    if (error.response) {
+      console.error('Infermedica Error Response:', error.response.data);
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 
 export default router;

@@ -48,6 +48,14 @@ export type InfermedicaQuestion = {
   items: InfermedicaQuestionItem[]
 }
 
+export type InitialQuestion = {
+  id: string
+  question: string
+  type: "age" | "select" | "text"
+  options?: string[]
+  tips: string[]
+}
+
 // Helper function to safely parse API responses
 export const parseJsonResponse = async (response: Response) => {
   try {

@@ -379,7 +379,7 @@ export default function ChatbotPage() {
           }
         } else if (nextDiagnosisResult.question) {
           setTimeout(() => {
-            addBotMessage(nextDiagnosisResult.question)
+            addBotMessage(nextDiagnosisResult.question!)
           }, 2000)
         } else {
           addBotMessage(
@@ -439,7 +439,7 @@ export default function ChatbotPage() {
           }
         } else if (nextDiagnosisResult.question) {
           setTimeout(() => {
-            addBotMessage(nextDiagnosisResult.question)
+            addBotMessage(nextDiagnosisResult.question!)
           }, 2000)
         } else {
           addBotMessage(
@@ -973,42 +973,27 @@ export default function ChatbotPage() {
   // }
 
   const displayFinalDiagnosis = async (conditions: Condition[]) => {
-    // Create a structured final diagnosis message
-    const finalDiagnosisContent = {
-      type: "final_diagnosis",
+    // Store diagnosis data for results page
+    const diagnosisData = {
       conditions: conditions || [],
       emergencySymptoms: emergencySymptoms,
+      userAge,
+      userSex,
+      userLocation,
+      evidence,
+      timestamp: new Date().toISOString(),
+      questionCount: diagnosisQuestionCount,
     }
 
-    addBotMessage(finalDiagnosisContent as any)
+    // Store in localStorage for results page
+    localStorage.setItem("diagnosisResults", JSON.stringify(diagnosisData))
 
-    // Show emergency warning if any emergency symptoms were detected
-    if (emergencySymptoms.length > 0) {
-      const emergencyMessage = `⚠️ **URGENT MEDICAL ATTENTION REQUIRED**\n\nThe following emergency indicators were detected during your assessment:\n\n${emergencySymptoms.map((symptom) => `• ${symptom}`).join("\n")}\n\n🚨 **Please contact emergency services (911) or visit the nearest emergency room immediately!** 🚨\n\nDo not delay seeking medical attention. These symptoms may indicate serious medical conditions that require immediate professional care.`
-
-      setTimeout(() => {
-        addBotMessage(emergencyMessage)
-      }, 1000)
-    }
-
-    // If there is a top condition, ask Gemini for more info and treatment
-    if (conditions && conditions.length > 0) {
-      const topCondition = conditions.reduce(
-        (max: Condition, cond: Condition) => (cond.probability > max.probability ? cond : max),
-        conditions[0],
-      )
-      // Custom prompt for Gemini
-      const geminiPrompt = `Provide a brief explanation and common treatment methods with headings in maximum 500 words for the medical condition "${topCondition.common_name || topCondition.name}". Please include what it is, typical symptoms, and standard treatments.`
-
-      // Ask Gemini and display the response
-      const geminiResponse = await askGemini(geminiPrompt)
-      const delay = emergencySymptoms.length > 0 ? 3000 : 1500 // Longer delay if emergency message shown
-      setTimeout(() => {
-        addBotMessage(
-          `**More information about ${topCondition.common_name || topCondition.name}:**\n\n${geminiResponse}`,
-        )
-      }, delay)
-    }
+    // Show completion message and redirect
+    addBotMessage("✅ Assessment complete! Redirecting you to your detailed results...")
+    
+    setTimeout(() => {
+      router.push("/results")
+    }, 2000)
   }
 
   const currentQuestion = questions[currentStep]
@@ -1113,179 +1098,6 @@ export default function ChatbotPage() {
                               return <br key={index} />
                             }
                           })}
-                        </div>
-                      ) : typeof message.content === "object" && (message.content as any).type === "final_diagnosis" ? (
-                        // Enhanced Final Diagnosis Display
-                        <div className="space-y-6">
-                          <div className="text-center">
-                            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-green-500 rounded-full mb-4">
-                              <Stethoscope className="h-8 w-8 text-white" />
-                            </div>
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                              Final Health Assessment
-                            </h2>
-                            <p className="text-gray-600 dark:text-gray-400">Based on your symptoms and responses</p>
-                          </div>
-
-                          {/* Emergency Symptoms Warning */}
-                          {"emergencySymptoms" in message.content &&
-                            Array.isArray((message.content as any).emergencySymptoms) &&
-                            (message.content as any).emergencySymptoms.length > 0 && (
-                              <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 border-2 border-red-500 dark:border-red-400">
-                                <div className="flex items-start space-x-3">
-                                  <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
-                                  <div className="flex-1">
-                                    <h3 className="font-bold text-red-900 dark:text-red-100 mb-3 text-lg">
-                                      🚨 URGENT: Emergency Symptoms Detected
-                                    </h3>
-                                    <div className="space-y-2 mb-4">
-                                      {(message.content as any).emergencySymptoms.map(
-                                        (symptom: string, index: number) => (
-                                          <div key={index} className="flex items-start space-x-2">
-                                            <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
-                                            <p className="text-sm text-red-800 dark:text-red-200 font-medium">
-                                              {symptom}
-                                            </p>
-                                          </div>
-                                        ),
-                                      )}
-                                    </div>
-                                    <div className="bg-red-100 dark:bg-red-900/40 rounded-lg p-3 border border-red-300 dark:border-red-700">
-                                      <p className="text-sm text-red-900 dark:text-red-100 font-bold text-center">
-                                        ⚠️ Please contact emergency services (911) or visit the nearest emergency room
-                                        immediately! ⚠️
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                          {"conditions" in message.content &&
-                          Array.isArray((message.content as any).conditions) &&
-                          (message.content as any).conditions.length > 0 ? (
-                            <div className="space-y-4">
-                              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
-                                <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-3 flex items-center">
-                                  <TrendingUp className="h-5 w-5 mr-2" />
-                                  Most Likely Conditions
-                                </h3>
-                                <div className="space-y-3">
-                                  {(message.content as { conditions: Condition[] }).conditions
-                                    .sort((a: Condition, b: Condition) => b.probability - a.probability)
-                                    .slice(0, 3)
-                                    .map((condition: Condition, index: number) => {
-                                      const percentage = (condition.probability * 100).toFixed(1)
-                                      const bgColor =
-                                        index === 0
-                                          ? "bg-red-100 dark:bg-red-900/30"
-                                          : index === 1
-                                            ? "bg-yellow-100 dark:bg-yellow-900/30"
-                                            : "bg-green-100 dark:bg-green-900/30"
-                                      const textColor =
-                                        index === 0
-                                          ? "text-red-800 dark:text-red-200"
-                                          : index === 1
-                                            ? "text-yellow-800 dark:text-yellow-200"
-                                            : "text-green-800 dark:text-green-200"
-
-                                      return (
-                                        <div key={condition.id} className={`${bgColor} rounded-lg p-3`}>
-                                          <div className="flex items-center justify-between mb-2">
-                                            <div className="flex-1">
-                                              <p className={`font-medium ${textColor}`}>
-                                                {condition.common_name || condition.name}
-                                              </p>
-                                              {condition.details?.severity && (
-                                                <p className={`text-xs ${textColor} opacity-75 mt-1`}>
-                                                  Severity:{" "}
-                                                  {condition.details.severity.charAt(0).toUpperCase() +
-                                                    condition.details.severity.slice(1)}
-                                                </p>
-                                              )}
-                                              {condition.details?.acuteness && (
-                                                <p className={`text-xs ${textColor} opacity-75 mt-1`}>
-                                                  Acuteness:{" "}
-                                                  {condition.details.acuteness.charAt(0).toUpperCase() +
-                                                    condition.details.acuteness.slice(1)}
-                                                </p>
-                                              )}
-                                              {condition.details?.prevalence && (
-                                                <p className={`text-xs ${textColor} opacity-75 mt-1`}>
-                                                  Prevalence:{" "}
-                                                  {condition.details.prevalence.charAt(0).toUpperCase() +
-                                                    condition.details.prevalence.slice(1)}
-                                                </p>
-                                              )}
-                                            </div>
-                                            <div className={`text-right ${textColor}`}>
-                                              <p className="text-lg font-bold">{percentage}%</p>
-                                            </div>
-                                          </div>
-                                          {condition.details?.description && (
-                                            <p className={`text-xs ${textColor} opacity-80 mt-2 leading-relaxed`}>
-                                              {condition.details.description}
-                                            </p>
-                                          )}
-                                          {condition.details?.icd10 && (
-                                            <p className={`text-xs ${textColor} opacity-60 mt-1`}>
-                                              ICD-10: {condition.details.icd10}
-                                            </p>
-                                          )}
-                                        </div>
-                                      )
-                                    })}
-                                </div>
-                              </div>
-
-                              <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800">
-                                <div className="flex items-start space-x-3">
-                                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                                  <div>
-                                    <h4 className="font-semibold text-amber-900 dark:text-amber-100 mb-2">
-                                      Important Disclaimer
-                                    </h4>
-                                    <p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed">
-                                      This AI assessment provides insights based on the information you've shared and is
-                                      not a substitute for professional medical advice. Always consult a qualified
-                                      healthcare professional for an accurate diagnosis and treatment plan.
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
-                                <div className="flex items-start space-x-3">
-                                  <Stethoscope className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                                  <div>
-                                    <h4 className="font-semibold text-green-900 dark:text-green-100 mb-2">
-                                      Next Steps
-                                    </h4>
-                                    <p className="text-sm text-green-800 dark:text-green-200 leading-relaxed">
-                                      Please schedule an appointment with your healthcare provider to discuss these
-                                      findings and get proper medical care. Early consultation is always recommended for
-                                      your health and well-being.
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6 border border-blue-200 dark:border-blue-800 text-center">
-                              <Info className="h-12 w-12 text-blue-600 dark:text-blue-400 mx-auto mb-4" />
-                              <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-                                No Specific Condition Identified
-                              </h3>
-                              <p className="text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
-                                Based on the information provided, I couldn't identify a specific condition at this
-                                time. This doesn't mean nothing is wrong - it's important to consult a qualified
-                                healthcare professional for a complete evaluation.
-                              </p>
-                              <p className="text-sm text-blue-800 dark:text-blue-200 leading-relaxed mt-2 font-medium">
-                                Your health and well-being are important! 🙏
-                              </p>
-                            </div>
-                          )}
                         </div>
                       ) : typeof message.content === "object" &&
                         (message.content as any).type === "max_questions_choice" ? (
