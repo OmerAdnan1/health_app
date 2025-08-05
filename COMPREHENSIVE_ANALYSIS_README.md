@@ -36,15 +36,15 @@ The results page shows:
 ## 📋 **What Users See**
 
 ### **1. Triage Assessment Section**
-```
+\`\`\`
 🚨 Medical Triage Assessment
 Urgency Level: CONSULTATION (color-coded badge)
 Recommendation: "Schedule appointment within 24 hours..."
 Serious Conditions: Heart Attack ⚠️, Stroke
-```
+\`\`\`
 
 ### **2. Detailed Condition Analysis**
-```
+\`\`\`
 🩺 Detailed Condition Analysis
 Condition: Acute Pharyngitis
 ├── Severity: Moderate
@@ -52,25 +52,25 @@ Condition: Acute Pharyngitis
 ├── Acuteness: Acute
 ├── ICD-10: J02.9
 └── Clinical Info: "Inflammation of throat..."
-```
+\`\`\`
 
 ### **3. Risk Factors Analysis**
-```
+\`\`\`
 🛡️ Risk Factors Analysis
 ┌─ Living in Asia (Geographic)
 │  Status: Present in patient profile
 │  Note: "May increase exposure to..."
 └─ Recent Travel (Lifestyle)
    Status: Present in patient profile
-```
+\`\`\`
 
 ### **4. Medical Explanation**
-```
+\`\`\`
 ℹ️ Medical Explanation
 Supporting Evidence: Fever, Sore Throat, Swollen Glands
 Conflicting Evidence: No Cough
 Unconfirmed Evidence: Fatigue
-```
+\`\`\`
 
 ### **5. Enhanced Gemini Analysis**
 Based on ALL the above data, Gemini provides:
@@ -85,7 +85,7 @@ Based on ALL the above data, Gemini provides:
 ## 🚀 **Technical Implementation**
 
 ### **Data Flow:**
-```
+\`\`\`
 User Diagnosis → localStorage → Results Page
        ↓
 Comprehensive Analysis Function
@@ -101,10 +101,10 @@ Enhanced Gemini Prompt (2000+ words)
 Comprehensive Medical Analysis
        ↓
 Rich UI Display
-```
+\`\`\`
 
 ### **Code Structure:**
-```typescript
+\`\`\`typescript
 // Automatic trigger in useEffect
 fetchComprehensiveAnalysis(diagnosisData)
 
@@ -125,7 +125,7 @@ createComprehensiveGeminiAnalysis(allData)
 <RiskFactorsAnalysis />
 <MedicalExplanation />
 <EnhancedGeminiAnalysis />
-```
+\`\`\`
 
 ## 📊 **Data Sources**
 
@@ -140,10 +140,10 @@ createComprehensiveGeminiAnalysis(allData)
 ## 🎯 **User Experience**
 
 ### **Loading Experience:**
-```
+\`\`\`
 🔄 "Gathering comprehensive medical analysis..."
    "Fetching triage assessment, condition details, risk factors, and explanations"
-```
+\`\`\`
 
 ### **Progressive Display:**
 1. **Loading indicator** appears immediately
@@ -165,7 +165,7 @@ createComprehensiveGeminiAnalysis(allData)
 The system can be easily extended:
 
 ### **Add New APIs:**
-```typescript
+\`\`\`typescript
 // Add to fetchComprehensiveAnalysis
 const newData = await getNewAPI(params)
 setNewDataState(newData)
@@ -175,7 +175,7 @@ const enhancedPrompt = `...existing data...
 NEW DATA SECTION:
 ${newData.details}
 ...`
-```
+\`\`\`
 
 ### **Modify Display:**
 Each section is modular and can be:

@@ -103,7 +103,7 @@ Comprehensive analysis automatically triggered:
 
 ## 📊 Data Flow Architecture
 
-```
+\`\`\`
 Health Assessment → localStorage → Results Page Load
                                          ↓
                               fetchComprehensiveAnalysis()
@@ -119,7 +119,7 @@ Health Assessment → localStorage → Results Page Load
             └─────────────────────────────────────────────────┘
                                          ↓
                            Professional Medical Display
-```
+\`\`\`
 
 ## 🏥 User Interface Features
 
@@ -170,7 +170,7 @@ The comprehensive medical analysis system is now **production-ready** and provid
 **Purpose**: Get information about specific risk factors
 **Endpoint**: `GET /api/infermedica/risk_factors/:id`
 
-```typescript
+\`\`\`typescript
 import { getRiskFactorDetails } from '@/lib/api/healthAPI'
 
 const riskFactor = await getRiskFactorDetails(
@@ -180,13 +180,13 @@ const riskFactor = await getRiskFactorDetails(
 
 console.log(riskFactor.category)  // geographic, lifestyle, etc.
 console.log(riskFactor.extras?.hint) // clinical information
-```
+\`\`\`
 
 ### 5. 📊 Risk Factors List API
 **Purpose**: Search and browse all available risk factors
 **Endpoint**: `GET /api/infermedica/risk_factors`
 
-```typescript
+\`\`\`typescript
 import { getRiskFactorsList } from '@/lib/api/healthAPI'
 
 // Get all geographic risk factors
@@ -198,13 +198,13 @@ const geoFactors = await getRiskFactorsList({
 const travelFactors = await getRiskFactorsList({
   phrase: 'travel'
 })
-```
+\`\`\`
 
 ## 🎣 Using React Hooks
 
 For complex workflows, use the provided hook:
 
-```typescript
+\`\`\`typescript
 import { useInfermedicaAPIs } from '@/hooks/useInfermedicaAPIs'
 
 function MyComponent() {
@@ -234,18 +234,18 @@ function MyComponent() {
     </div>
   )
 }
-```
+\`\`\`
 
 ## 🎨 UI Components
 
 Use the pre-built `AdvancedAnalysis` component in your results page:
 
-```typescript
+\`\`\`typescript
 import AdvancedAnalysis from '@/components/AdvancedAnalysis'
 
 // In your results page
 <AdvancedAnalysis diagnosisData={diagnosisData} />
-```
+\`\`\`
 
 This component provides:
 - ✅ Triage assessment with urgency badges
@@ -256,13 +256,13 @@ This component provides:
 
 ## 📊 Data Flow
 
-```
+\`\`\`
 User Symptoms → Diagnosis → Enhanced Analysis
      ↓              ↓             ↓
   Evidence     Conditions    Triage Level
      ↓              ↓             ↓
 Risk Factors → Details APIs → Rich Results
-```
+\`\`\`
 
 ## 🔧 Backend Configuration
 
@@ -277,7 +277,7 @@ All endpoints automatically:
 
 All functions include proper error handling:
 
-```typescript
+\`\`\`typescript
 try {
   const result = await getTriageResult(age, sex, evidence, interviewId)
   // Handle success
@@ -285,21 +285,21 @@ try {
   console.error('Triage failed:', error.message)
   // Handle error - show user-friendly message
 }
-```
+\`\`\`
 
 ## 📱 Integration Examples
 
 ### Quick Triage Check
-```typescript
+\`\`\`typescript
 // Quick urgency assessment
 const urgency = await getTriageResult(age, sex, evidence, interviewId)
 if (urgency.triage_level === 'emergency') {
   showEmergencyAlert()
 }
-```
+\`\`\`
 
 ### Condition Deep Dive
-```typescript
+\`\`\`typescript
 // Get detailed condition information
 const details = await getConditionDetails(conditionId)
 displayConditionInfo({
@@ -307,17 +307,17 @@ displayConditionInfo({
   severity: details.severity,
   icd10: details.extras?.icd10_code
 })
-```
+\`\`\`
 
 ### Risk Factor Analysis
-```typescript
+\`\`\`typescript
 // Analyze geographic risk factors
 const geoEvidence = evidence.filter(e => e.id.startsWith('p_'))
 for (const factor of geoEvidence) {
   const details = await getRiskFactorDetails(factor.id)
   addRiskFactorInfo(details)
 }
-```
+\`\`\`
 
 ## 🎯 Best Practices
 
