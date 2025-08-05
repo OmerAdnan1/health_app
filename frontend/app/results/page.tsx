@@ -33,6 +33,7 @@ import {
   Check,
   Clock,
   Heart,
+  TrendingUp,
 } from "lucide-react"
 
 export default function ResultsPage() {
@@ -295,39 +296,39 @@ Report ID: ${diagnosisData.interviewId}
   const getTriageColor = (level: string) => {
     switch (level) {
       case "emergency":
-        return "text-red-700 bg-red-50 border-red-300"
+        return "text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-900/20 dark:border-red-800"
       case "consultation_24":
-        return "text-orange-700 bg-orange-50 border-orange-300"
+        return "text-orange-600 bg-orange-50 border-orange-200 dark:text-orange-400 dark:bg-orange-900/20 dark:border-orange-800"
       case "consultation":
-        return "text-yellow-700 bg-yellow-50 border-yellow-300"
+        return "text-yellow-600 bg-yellow-50 border-yellow-200 dark:text-yellow-400 dark:bg-yellow-900/20 dark:border-yellow-800"
       default:
-        return "text-green-700 bg-green-50 border-green-300"
+        return "text-green-600 bg-green-50 border-green-200 dark:text-green-400 dark:bg-green-900/20 dark:border-green-800"
     }
   }
 
   const getSeverityBadge = (severity: string) => {
     switch (severity) {
       case "severe":
-        return "bg-red-100 text-red-800 border-red-300"
+        return "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700"
       case "moderate":
-        return "bg-orange-100 text-orange-800 border-orange-300"
+        return "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700"
       case "mild":
-        return "bg-green-100 text-green-800 border-green-300"
+        return "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700"
       default:
-        return "bg-gray-100 text-gray-800 border-gray-300"
+        return "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600"
     }
   }
 
   const getPrevalenceBadge = (prevalence: string) => {
     switch (prevalence) {
       case "very_rare":
-        return "bg-red-100 text-red-800 border-red-300"
+        return "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700"
       case "rare":
-        return "bg-orange-100 text-orange-800 border-orange-300"
+        return "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700"
       case "common":
-        return "bg-green-100 text-green-800 border-green-300"
+        return "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700"
       default:
-        return "bg-gray-100 text-gray-800 border-gray-300"
+        return "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600"
     }
   }
 
@@ -342,7 +343,10 @@ Report ID: ${diagnosisData.interviewId}
       // Handle H2 headers (##)
       if (trimmedLine.startsWith("## ")) {
         return (
-          <h2 key={index} className="text-2xl font-bold text-gray-900 mt-8 mb-4 border-b-2 border-blue-500 pb-2">
+          <h2
+            key={index}
+            className="text-2xl font-bold text-gray-900 dark:text-white mt-8 mb-6 pb-3 border-b-2 border-blue-500 dark:border-blue-400"
+          >
             {trimmedLine.replace("## ", "")}
           </h2>
         )
@@ -351,7 +355,7 @@ Report ID: ${diagnosisData.interviewId}
       // Handle H3 headers (###)
       if (trimmedLine.startsWith("### ")) {
         return (
-          <h3 key={index} className="text-xl font-semibold text-gray-800 mt-6 mb-3">
+          <h3 key={index} className="text-xl font-semibold text-gray-800 dark:text-gray-200 mt-6 mb-4">
             {trimmedLine.replace("### ", "")}
           </h3>
         )
@@ -360,11 +364,16 @@ Report ID: ${diagnosisData.interviewId}
       // Handle bullet points
       if (trimmedLine.startsWith("- ")) {
         return (
-          <div key={index} className="flex items-start mb-2">
-            <div className="w-2 h-2 bg-blue-500 rounded-full mr-3 mt-2 flex-shrink-0"></div>
-            <p className="text-gray-700 leading-relaxed">
-              {trimmedLine.replace("- ", "").replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")}
-            </p>
+          <div key={index} className="flex items-start mb-3">
+            <div className="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full mr-3 mt-2 flex-shrink-0"></div>
+            <p
+              className="text-gray-700 dark:text-gray-300 leading-relaxed"
+              dangerouslySetInnerHTML={{
+                __html: trimmedLine
+                  .replace("- ", "")
+                  .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900 dark:text-white">$1</strong>'),
+              }}
+            />
           </div>
         )
       }
@@ -372,13 +381,13 @@ Report ID: ${diagnosisData.interviewId}
       // Handle bold text and regular paragraphs
       const processedText = trimmedLine.replace(
         /\*\*(.*?)\*\*/g,
-        '<strong class="font-semibold text-gray-900">$1</strong>',
+        '<strong class="font-semibold text-gray-900 dark:text-white">$1</strong>',
       )
 
       return (
         <p
           key={index}
-          className="text-gray-700 mb-3 leading-relaxed"
+          className="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed"
           dangerouslySetInnerHTML={{ __html: processedText }}
         />
       )
@@ -387,10 +396,10 @@ Report ID: ${diagnosisData.interviewId}
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mx-auto mb-6"></div>
-          <p className="text-gray-600 text-lg">Loading your assessment results...</p>
+          <p className="text-gray-600 dark:text-gray-400 text-lg">Loading your assessment results...</p>
         </div>
       </div>
     )
@@ -398,14 +407,16 @@ Report ID: ${diagnosisData.interviewId}
 
   if (!diagnosisData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-8">
-          <FileText className="h-20 w-20 text-gray-400 mx-auto mb-6" />
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">No Assessment Data Found</h2>
-          <p className="text-gray-600 mb-8 text-lg">Please start a new health assessment to generate your report.</p>
+          <FileText className="h-20 w-20 text-gray-400 dark:text-gray-500 mx-auto mb-6" />
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">No Assessment Data Found</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-8 text-lg">
+            Please start a new health assessment to generate your report.
+          </p>
           <button
             onClick={() => router.push("/chatbot")}
-            className="px-8 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold text-lg shadow-lg"
+            className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-105"
           >
             Start New Assessment
           </button>
@@ -417,66 +428,72 @@ Report ID: ${diagnosisData.interviewId}
   const TriageIcon = getTriageIcon(triageData?.triage_level || "self_care")
 
   return (
-    <div className="min-h-screen bg-gray-50 font-['Inter']">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
       <Header />
 
       <main className="pt-20 pb-16">
-        <div className="max-w-4xl mx-auto px-6 space-y-8">
-          {/* Report Header */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
-            <div className="text-center mb-8">
-              <div className="flex items-center justify-center mb-4">
-                <div className="p-3 bg-blue-600 rounded-full mr-4">
-                  <Heart className="h-8 w-8 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-4xl font-bold text-gray-900">Health Assessment Report</h1>
-                  <p className="text-lg text-gray-600 mt-1">Generated by HealthBuddy AI</p>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+          {/* Hero Header */}
+          <div className="text-center py-12">
+            <div className="inline-flex items-center justify-center p-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full mb-6">
+              <Heart className="h-12 w-12 text-white" />
+            </div>
+            <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+              Health Assessment Report
+            </h1>
+            <p className="text-xl text-gray-600 dark:text-gray-400 mb-2">Generated by HealthBuddy AI</p>
+            <p className="text-gray-500 dark:text-gray-500">
+              Assessment Date:{" "}
+              {new Date(diagnosisData.timestamp).toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </p>
+          </div>
+
+          {/* Patient Profile Card */}
+          <div className="glass rounded-3xl p-8 border border-white/20 dark:border-gray-700/50 shadow-xl">
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
+              <User className="h-7 w-7 mr-3 text-blue-500" />
+              Assessment Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white/50 dark:bg-gray-800/50 rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50">
+                <div className="flex items-center">
+                  <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl mr-4">
+                    <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Age</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{diagnosisData.userAge}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">years</p>
+                  </div>
                 </div>
               </div>
-              <p className="text-gray-500 text-sm">
-                Assessment Date:{" "}
-                {new Date(diagnosisData.timestamp).toLocaleDateString("en-US", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </p>
-            </div>
-
-            {/* Patient Profile */}
-            <div className="border-t border-gray-200 pt-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-                <User className="h-6 w-6 mr-3 text-blue-600" />
-                Assessment Information
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                  <div className="flex items-center">
-                    <Calendar className="h-5 w-5 text-gray-500 mr-3" />
-                    <div>
-                      <p className="text-sm text-gray-500 font-medium">Age</p>
-                      <p className="text-lg font-semibold text-gray-900">{diagnosisData.userAge} years</p>
-                    </div>
+              <div className="bg-white/50 dark:bg-gray-800/50 rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50">
+                <div className="flex items-center">
+                  <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl mr-4">
+                    <User className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Gender</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white capitalize">
+                      {diagnosisData.userSex}
+                    </p>
                   </div>
                 </div>
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                  <div className="flex items-center">
-                    <User className="h-5 w-5 text-gray-500 mr-3" />
-                    <div>
-                      <p className="text-sm text-gray-500 font-medium">Gender</p>
-                      <p className="text-lg font-semibold text-gray-900 capitalize">{diagnosisData.userSex}</p>
-                    </div>
+              </div>
+              <div className="bg-white/50 dark:bg-gray-800/50 rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50">
+                <div className="flex items-center">
+                  <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl mr-4">
+                    <FileText className="h-6 w-6 text-green-600 dark:text-green-400" />
                   </div>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                  <div className="flex items-center">
-                    <FileText className="h-5 w-5 text-gray-500 mr-3" />
-                    <div>
-                      <p className="text-sm text-gray-500 font-medium">Questions Answered</p>
-                      <p className="text-lg font-semibold text-gray-900">{diagnosisData.evidence.length}</p>
-                    </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Questions</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{diagnosisData.evidence.length}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">answered</p>
                   </div>
                 </div>
               </div>
@@ -485,25 +502,32 @@ Report ID: ${diagnosisData.interviewId}
 
           {/* Emergency Warning */}
           {diagnosisData.emergencySymptoms.length > 0 && (
-            <div className="bg-red-50 border-l-4 border-red-500 rounded-2xl shadow-lg p-8">
+            <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded-3xl p-8 shadow-xl">
               <div className="flex items-start">
-                <AlertTriangle className="h-10 w-10 text-red-600 mr-6 flex-shrink-0 mt-1" />
+                <div className="p-3 bg-red-500 rounded-full mr-6 flex-shrink-0">
+                  <AlertTriangle className="h-8 w-8 text-white" />
+                </div>
                 <div className="flex-1">
-                  <h2 className="text-3xl font-bold text-red-900 mb-6">⚠️ Emergency Symptoms Detected</h2>
-                  <div className="bg-red-100 rounded-xl p-6 border border-red-200 mb-6">
-                    <p className="text-red-800 font-semibold mb-4 text-lg">
+                  <h2 className="text-3xl font-bold text-red-900 dark:text-red-300 mb-6">
+                    ⚠️ Emergency Symptoms Detected
+                  </h2>
+                  <div className="bg-red-100 dark:bg-red-900/40 rounded-2xl p-6 border border-red-200 dark:border-red-700 mb-6">
+                    <p className="text-red-800 dark:text-red-300 font-semibold mb-4 text-lg">
                       Critical symptoms identified during assessment:
                     </p>
-                    <ul className="space-y-2">
+                    <div className="space-y-3">
                       {diagnosisData.emergencySymptoms.map((symptom, index) => (
-                        <li key={index} className="flex items-center text-red-800">
-                          <AlertCircle className="h-5 w-5 mr-3 flex-shrink-0" />
-                          <span className="font-medium">{symptom}</span>
-                        </li>
+                        <div
+                          key={index}
+                          className="flex items-center p-3 bg-white dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-700"
+                        >
+                          <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mr-3 flex-shrink-0" />
+                          <span className="font-medium text-red-800 dark:text-red-300">{symptom}</span>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </div>
-                  <div className="bg-red-600 text-white p-6 rounded-xl">
+                  <div className="bg-red-600 dark:bg-red-700 text-white p-6 rounded-2xl">
                     <p className="font-bold text-xl mb-2">🚨 SEEK IMMEDIATE MEDICAL ATTENTION</p>
                     <p className="text-red-100">
                       Contact emergency services (911) or visit the nearest emergency room immediately. Do not delay
@@ -517,46 +541,55 @@ Report ID: ${diagnosisData.interviewId}
 
           {/* Medical Triage Assessment */}
           {triageData && (
-            <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                <TriageIcon className="h-7 w-7 mr-3 text-blue-600" />
+            <div className="glass rounded-3xl p-8 border border-white/20 dark:border-gray-700/50 shadow-xl">
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-8 flex items-center">
+                <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl mr-4">
+                  <TriageIcon className="h-8 w-8 text-white" />
+                </div>
                 Medical Triage Assessment
               </h2>
 
               <div className="space-y-6">
-                <div className="flex items-center space-x-4">
-                  <span className="text-lg font-medium text-gray-700">Urgency Level:</span>
+                <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
+                  <span className="text-xl font-medium text-gray-700 dark:text-gray-300">Urgency Level:</span>
                   <div
-                    className={`px-6 py-3 rounded-xl font-bold text-xl border-2 ${getTriageColor(triageData.triage_level)} shadow-sm`}
+                    className={`px-6 py-4 rounded-2xl font-bold text-xl border-2 ${getTriageColor(triageData.triage_level)} shadow-lg inline-flex items-center`}
                   >
-                    <TriageIcon className="h-6 w-6 inline mr-2" />
+                    <TriageIcon className="h-6 w-6 mr-3" />
                     {triageData.triage_level?.replace("_", " ").toUpperCase()}
                   </div>
                 </div>
 
                 {/* Primary Recommendation */}
                 {conditionDetails[0]?.extras?.hint && (
-                  <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
-                    <h4 className="font-semibold text-blue-900 mb-3 flex items-center text-lg">
-                      <Stethoscope className="h-5 w-5 mr-2" />
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-6 border border-blue-200 dark:border-blue-800">
+                    <h4 className="font-bold text-blue-900 dark:text-blue-300 mb-4 flex items-center text-lg">
+                      <Stethoscope className="h-6 w-6 mr-3" />
                       Primary Recommendation:
                     </h4>
-                    <p className="text-blue-800 font-medium leading-relaxed">{conditionDetails[0].extras.hint}</p>
+                    <p className="text-blue-800 dark:text-blue-300 font-medium leading-relaxed text-lg">
+                      {conditionDetails[0].extras.hint}
+                    </p>
                   </div>
                 )}
 
                 {/* Serious Conditions */}
                 {triageData.serious && triageData.serious.length > 0 && (
-                  <div className="bg-orange-50 rounded-xl p-6 border border-orange-200">
-                    <h4 className="font-semibold text-orange-900 mb-4 flex items-center text-lg">
-                      <AlertTriangle className="h-5 w-5 mr-2" />
+                  <div className="bg-orange-50 dark:bg-orange-900/20 rounded-2xl p-6 border border-orange-200 dark:border-orange-800">
+                    <h4 className="font-bold text-orange-900 dark:text-orange-300 mb-4 flex items-center text-lg">
+                      <AlertTriangle className="h-6 w-6 mr-3" />
                       Serious Conditions to Consider:
                     </h4>
-                    <div className="space-y-3">
+                    <div className="grid gap-3">
                       {triageData.serious.map((condition: any, index: number) => (
-                        <div key={index} className="flex items-center p-3 bg-white rounded-lg border border-orange-200">
-                          <div className="w-3 h-3 bg-orange-500 rounded-full mr-3 flex-shrink-0"></div>
-                          <span className="font-medium text-gray-900">{condition.common_name || condition.name}</span>
+                        <div
+                          key={index}
+                          className="flex items-center p-4 bg-white dark:bg-orange-900/10 rounded-xl border border-orange-200 dark:border-orange-700"
+                        >
+                          <div className="w-3 h-3 bg-orange-500 rounded-full mr-4 flex-shrink-0"></div>
+                          <span className="font-semibold text-gray-900 dark:text-white text-lg">
+                            {condition.common_name || condition.name}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -568,18 +601,25 @@ Report ID: ${diagnosisData.interviewId}
 
           {/* Loading State for Comprehensive Analysis */}
           {comprehensiveAnalysisLoading && (
-            <div className="bg-white rounded-2xl shadow-lg p-12 border border-gray-200">
+            <div className="glass rounded-3xl p-12 border border-white/20 dark:border-gray-700/50 shadow-xl">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-6"></div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Analyzing Clinical Data</h3>
-                <p className="text-gray-600">Generating comprehensive report with detailed medical insights...</p>
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mx-auto mb-6"></div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Analyzing Clinical Data</h3>
+                <p className="text-gray-600 dark:text-gray-400 text-lg">
+                  Generating comprehensive report with detailed medical insights...
+                </p>
               </div>
             </div>
           )}
 
-          {/* Most Likely Conditions & Detailed Analysis */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-900 mb-8">Most Likely Conditions & Detailed Analysis</h2>
+          {/* Most Likely Conditions */}
+          <div className="glass rounded-3xl p-8 border border-white/20 dark:border-gray-700/50 shadow-xl">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-8 flex items-center">
+              <div className="p-3 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl mr-4">
+                <TrendingUp className="h-8 w-8 text-white" />
+              </div>
+              Most Likely Conditions & Analysis
+            </h2>
 
             <div className="space-y-8">
               {conditionDetails.map((details, index) => {
@@ -587,44 +627,57 @@ Report ID: ${diagnosisData.interviewId}
                 const explanation = explainData.find((e) => e.conditionId === condition.id)
 
                 return (
-                  <div key={condition.id} className="border border-gray-200 rounded-xl p-6 bg-gray-50">
+                  <div
+                    key={condition.id}
+                    className="bg-white/50 dark:bg-gray-800/50 rounded-2xl p-8 border border-gray-200/50 dark:border-gray-700/50"
+                  >
                     {/* Condition Header */}
                     <div className="flex items-start justify-between mb-6">
                       <div className="flex-1">
-                        <div className="flex items-center mb-3">
+                        <div className="flex items-center mb-4">
                           <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold mr-4 ${
-                              index === 0 ? "bg-red-500" : index === 1 ? "bg-orange-500" : "bg-blue-500"
+                            className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl mr-6 ${
+                              index === 0
+                                ? "bg-gradient-to-r from-red-500 to-pink-500"
+                                : index === 1
+                                  ? "bg-gradient-to-r from-orange-500 to-yellow-500"
+                                  : "bg-gradient-to-r from-blue-500 to-purple-500"
                             }`}
                           >
                             {index + 1}
                           </div>
-                          <h3 className="text-2xl font-bold text-gray-900">
-                            {condition.common_name || condition.name}
-                          </h3>
-                        </div>
-                        <div className="flex items-center space-x-4 mb-2">
-                          <span className="text-3xl font-bold text-blue-600">
-                            {(condition.probability * 100).toFixed(1)}%
-                          </span>
-                          <span className="text-gray-500 text-lg">probability</span>
+                          <div>
+                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                              {condition.common_name || condition.name}
+                            </h3>
+                            <div className="flex items-center space-x-4">
+                              <span className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                                {(condition.probability * 100).toFixed(1)}%
+                              </span>
+                              <span className="text-gray-500 dark:text-gray-400 text-lg">probability</span>
+                            </div>
+                          </div>
                         </div>
                         {details.extras?.icd10_code && (
-                          <p className="text-sm text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded inline-block">
-                            ICD-10: {details.extras.icd10_code}
-                          </p>
+                          <div className="inline-block bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-lg">
+                            <span className="text-sm font-mono text-gray-600 dark:text-gray-300">
+                              ICD-10: {details.extras.icd10_code}
+                            </span>
+                          </div>
                         )}
                       </div>
                     </div>
 
                     {/* Clinical Information */}
                     {details.extras?.hint && (
-                      <div className="bg-blue-50 rounded-xl p-6 border border-blue-200 mb-6">
-                        <h4 className="font-semibold text-blue-900 mb-3 flex items-center text-lg">
-                          <Stethoscope className="h-5 w-5 mr-2" />
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-6 border border-blue-200 dark:border-blue-800 mb-6">
+                        <h4 className="font-bold text-blue-900 dark:text-blue-300 mb-3 flex items-center text-lg">
+                          <Stethoscope className="h-6 w-6 mr-3" />
                           Clinical Information:
                         </h4>
-                        <p className="text-blue-800 leading-relaxed">{details.extras.hint}</p>
+                        <p className="text-blue-800 dark:text-blue-300 leading-relaxed text-lg">
+                          {details.extras.hint}
+                        </p>
                       </div>
                     )}
 
@@ -632,30 +685,30 @@ Report ID: ${diagnosisData.interviewId}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                       {details.severity && (
                         <div
-                          className={`px-4 py-3 rounded-lg border-2 text-center ${getSeverityBadge(details.severity)}`}
+                          className={`px-4 py-3 rounded-xl border-2 text-center ${getSeverityBadge(details.severity)}`}
                         >
-                          <p className="text-xs font-medium uppercase tracking-wide mb-1">Severity</p>
-                          <p className="font-semibold capitalize">{details.severity}</p>
+                          <p className="text-xs font-bold uppercase tracking-wide mb-1">Severity</p>
+                          <p className="font-bold capitalize">{details.severity}</p>
                         </div>
                       )}
                       {details.prevalence && (
                         <div
-                          className={`px-4 py-3 rounded-lg border-2 text-center ${getPrevalenceBadge(details.prevalence)}`}
+                          className={`px-4 py-3 rounded-xl border-2 text-center ${getPrevalenceBadge(details.prevalence)}`}
                         >
-                          <p className="text-xs font-medium uppercase tracking-wide mb-1">Prevalence</p>
-                          <p className="font-semibold capitalize">{details.prevalence.replace("_", " ")}</p>
+                          <p className="text-xs font-bold uppercase tracking-wide mb-1">Prevalence</p>
+                          <p className="font-bold capitalize">{details.prevalence.replace("_", " ")}</p>
                         </div>
                       )}
                       {details.acuteness && (
-                        <div className="px-4 py-3 rounded-lg border-2 text-center bg-purple-100 text-purple-800 border-purple-300">
-                          <p className="text-xs font-medium uppercase tracking-wide mb-1">Acuteness</p>
-                          <p className="font-semibold capitalize">{details.acuteness.replace("_", " ")}</p>
+                        <div className="px-4 py-3 rounded-xl border-2 text-center bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-700">
+                          <p className="text-xs font-bold uppercase tracking-wide mb-1">Acuteness</p>
+                          <p className="font-bold capitalize">{details.acuteness.replace("_", " ")}</p>
                         </div>
                       )}
                       {details.sex_filter && (
-                        <div className="px-4 py-3 rounded-lg border-2 text-center bg-gray-100 text-gray-800 border-gray-300">
-                          <p className="text-xs font-medium uppercase tracking-wide mb-1">Sex Filter</p>
-                          <p className="font-semibold capitalize">{details.sex_filter}</p>
+                        <div className="px-4 py-3 rounded-xl border-2 text-center bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-gray-300 dark:border-gray-600">
+                          <p className="text-xs font-bold uppercase tracking-wide mb-1">Sex Filter</p>
+                          <p className="font-bold capitalize">{details.sex_filter}</p>
                         </div>
                       )}
                     </div>
@@ -665,19 +718,19 @@ Report ID: ${diagnosisData.interviewId}
                       <div className="grid md:grid-cols-2 gap-6">
                         {/* Supporting Evidence */}
                         {explanation.supporting_evidence && explanation.supporting_evidence.length > 0 && (
-                          <div className="bg-green-50 rounded-xl p-6 border border-green-200">
-                            <h4 className="font-semibold text-green-900 mb-4 flex items-center text-lg">
-                              <Check className="h-5 w-5 mr-2" />
+                          <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-6 border border-green-200 dark:border-green-800">
+                            <h4 className="font-bold text-green-900 dark:text-green-300 mb-4 flex items-center text-lg">
+                              <Check className="h-6 w-6 mr-3" />
                               Supporting Evidence:
                             </h4>
                             <div className="space-y-3">
                               {explanation.supporting_evidence.map((evidence: any, idx: number) => (
                                 <div
                                   key={idx}
-                                  className="flex items-center p-3 bg-white rounded-lg border border-green-200"
+                                  className="flex items-center p-3 bg-white dark:bg-green-900/10 rounded-xl border border-green-200 dark:border-green-700"
                                 >
-                                  <Check className="h-4 w-4 text-green-600 mr-3 flex-shrink-0" />
-                                  <span className="text-sm font-medium text-gray-900">
+                                  <Check className="h-5 w-5 text-green-600 dark:text-green-400 mr-3 flex-shrink-0" />
+                                  <span className="font-medium text-gray-900 dark:text-white">
                                     {evidence.common_name || evidence.name}
                                   </span>
                                 </div>
@@ -688,19 +741,19 @@ Report ID: ${diagnosisData.interviewId}
 
                         {/* Conflicting Evidence */}
                         {explanation.conflicting_evidence && explanation.conflicting_evidence.length > 0 && (
-                          <div className="bg-red-50 rounded-xl p-6 border border-red-200">
-                            <h4 className="font-semibold text-red-900 mb-4 flex items-center text-lg">
-                              <X className="h-5 w-5 mr-2" />
+                          <div className="bg-red-50 dark:bg-red-900/20 rounded-2xl p-6 border border-red-200 dark:border-red-800">
+                            <h4 className="font-bold text-red-900 dark:text-red-300 mb-4 flex items-center text-lg">
+                              <X className="h-6 w-6 mr-3" />
                               Conflicting Evidence:
                             </h4>
                             <div className="space-y-3">
                               {explanation.conflicting_evidence.map((evidence: any, idx: number) => (
                                 <div
                                   key={idx}
-                                  className="flex items-center p-3 bg-white rounded-lg border border-red-200"
+                                  className="flex items-center p-3 bg-white dark:bg-red-900/10 rounded-xl border border-red-200 dark:border-red-700"
                                 >
-                                  <X className="h-4 w-4 text-red-600 mr-3 flex-shrink-0" />
-                                  <span className="text-sm font-medium text-gray-900">
+                                  <X className="h-5 w-5 text-red-600 dark:text-red-400 mr-3 flex-shrink-0" />
+                                  <span className="font-medium text-gray-900 dark:text-white">
                                     {evidence.common_name || evidence.name}
                                   </span>
                                 </div>
@@ -716,11 +769,13 @@ Report ID: ${diagnosisData.interviewId}
             </div>
           </div>
 
-          {/* Risk Factors & Context */}
+          {/* Risk Factors */}
           {riskFactorDetails.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                <Target className="h-7 w-7 mr-3 text-orange-600" />
+            <div className="glass rounded-3xl p-8 border border-white/20 dark:border-gray-700/50 shadow-xl">
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-8 flex items-center">
+                <div className="p-3 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl mr-4">
+                  <Target className="h-8 w-8 text-white" />
+                </div>
                 Relevant Risk Factors
               </h2>
 
@@ -735,21 +790,24 @@ Report ID: ${diagnosisData.interviewId}
                   const RiskIcon = getRiskIcon(riskFactor.id)
 
                   return (
-                    <div key={index} className="bg-orange-50 rounded-xl p-6 border border-orange-200">
-                      <div className="flex items-start justify-between mb-3">
+                    <div
+                      key={index}
+                      className="bg-orange-50 dark:bg-orange-900/20 rounded-2xl p-6 border border-orange-200 dark:border-orange-800"
+                    >
+                      <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center flex-1">
-                          <div className="p-2 bg-orange-500 rounded-lg mr-4">
-                            <RiskIcon className="h-5 w-5 text-white" />
+                          <div className="p-3 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl mr-4">
+                            <RiskIcon className="h-6 w-6 text-white" />
                           </div>
-                          <h3 className="font-semibold text-gray-900 text-lg">
+                          <h3 className="font-bold text-gray-900 dark:text-white text-lg">
                             {riskFactor.common_name || riskFactor.name}
                           </h3>
                         </div>
-                        <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full border border-green-200">
+                        <span className="px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 font-bold rounded-full border border-green-200 dark:border-green-700">
                           Present
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600 ml-12">Status: Present in patient profile</p>
+                      <p className="text-gray-600 dark:text-gray-400 ml-16">Status: Present in patient profile</p>
                     </div>
                   )
                 })}
@@ -758,78 +816,79 @@ Report ID: ${diagnosisData.interviewId}
           )}
 
           {/* Next Steps & Patient Education */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
+          <div className="glass rounded-3xl p-8 border border-white/20 dark:border-gray-700/50 shadow-xl">
             {loadingGemini ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent mx-auto mb-6"></div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Generating Personalized Guidance</h3>
-                <p className="text-gray-600">Creating comprehensive next steps and patient education content...</p>
+              <div className="text-center py-16">
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mx-auto mb-6"></div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                  Generating Personalized Guidance
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 text-lg">
+                  Creating comprehensive next steps and patient education content...
+                </p>
               </div>
             ) : geminiError ? (
-              <div className="text-center py-12">
-                <AlertCircle className="h-16 w-16 text-red-400 mx-auto mb-6" />
-                <h3 className="text-xl font-semibold text-red-600 mb-2">Content Generation Error</h3>
-                <p className="text-red-500">Unable to generate patient education content. Please try again.</p>
+              <div className="text-center py-16">
+                <AlertCircle className="h-20 w-20 text-red-400 mx-auto mb-6" />
+                <h3 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">Content Generation Error</h3>
+                <p className="text-red-500 dark:text-red-400 text-lg">
+                  Unable to generate patient education content. Please try again.
+                </p>
               </div>
             ) : geminiInfo ? (
-              <div className="prose max-w-none">{renderMarkdownContent(geminiInfo)}</div>
+              <div className="prose prose-lg max-w-none dark:prose-invert">{renderMarkdownContent(geminiInfo)}</div>
             ) : (
-              <div className="text-center py-12">
-                <Clock className="h-16 w-16 text-gray-400 mx-auto mb-6" />
-                <h3 className="text-xl font-semibold text-gray-500 mb-2">Preparing Content</h3>
-                <p className="text-gray-500">Patient education content is being prepared...</p>
+              <div className="text-center py-16">
+                <Clock className="h-20 w-20 text-gray-400 dark:text-gray-500 mx-auto mb-6" />
+                <h3 className="text-2xl font-bold text-gray-500 dark:text-gray-400 mb-4">Preparing Content</h3>
+                <p className="text-gray-500 dark:text-gray-400 text-lg">
+                  Patient education content is being prepared...
+                </p>
               </div>
             )}
 
-            {/* Red Flags Alert - Always shown */}
-            <div className="mt-8 bg-red-50 border-l-4 border-red-500 rounded-xl p-6">
+            {/* Red Flags Alert */}
+            <div className="mt-8 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded-2xl p-6">
               <div className="flex items-start">
-                <AlertCircle className="h-6 w-6 text-red-600 mr-4 mt-1 flex-shrink-0" />
+                <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400 mr-4 mt-1 flex-shrink-0" />
                 <div>
-                  <h4 className="font-semibold text-red-900 mb-3 text-lg">Red Flags - Seek Immediate Care If:</h4>
-                  <ul className="text-red-800 space-y-2">
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-red-500 rounded-full mr-3 mt-2 flex-shrink-0"></div>
-                      Difficulty breathing or shortness of breath
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-red-500 rounded-full mr-3 mt-2 flex-shrink-0"></div>
-                      Severe chest pain or pressure
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-red-500 rounded-full mr-3 mt-2 flex-shrink-0"></div>
-                      High fever (over 103°F/39.4°C) that doesn't respond to medication
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-red-500 rounded-full mr-3 mt-2 flex-shrink-0"></div>
-                      Severe headache with neck stiffness
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-red-500 rounded-full mr-3 mt-2 flex-shrink-0"></div>
-                      Confusion or altered mental state
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-red-500 rounded-full mr-3 mt-2 flex-shrink-0"></div>
-                      Persistent vomiting or inability to keep fluids down
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-red-500 rounded-full mr-3 mt-2 flex-shrink-0"></div>
-                      Signs of severe dehydration
-                    </li>
-                  </ul>
+                  <h4 className="font-bold text-red-900 dark:text-red-300 mb-4 text-xl">
+                    Red Flags - Seek Immediate Care If:
+                  </h4>
+                  <div className="grid gap-3">
+                    {[
+                      "Difficulty breathing or shortness of breath",
+                      "Severe chest pain or pressure",
+                      "High fever (over 103°F/39.4°C) that doesn't respond to medication",
+                      "Severe headache with neck stiffness",
+                      "Confusion or altered mental state",
+                      "Persistent vomiting or inability to keep fluids down",
+                      "Signs of severe dehydration",
+                    ].map((symptom, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start p-3 bg-white dark:bg-red-900/10 rounded-xl border border-red-200 dark:border-red-700"
+                      >
+                        <div className="w-3 h-3 bg-red-500 rounded-full mr-4 mt-2 flex-shrink-0"></div>
+                        <span className="text-red-800 dark:text-red-300 font-medium">{symptom}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Important Disclaimer */}
-          <div className="bg-red-50 border-l-4 border-red-500 rounded-2xl shadow-lg p-8">
+          <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded-3xl p-8 shadow-xl">
             <div className="flex items-start">
-              <ShieldAlert className="h-10 w-10 text-red-600 mr-6 flex-shrink-0 mt-1" />
+              <div className="p-3 bg-red-500 rounded-full mr-6 flex-shrink-0">
+                <ShieldAlert className="h-8 w-8 text-white" />
+              </div>
               <div>
-                <h2 className="text-2xl font-bold text-red-900 mb-6">Crucial Disclaimer</h2>
-                <div className="text-red-800 space-y-4 leading-relaxed">
-                  <p className="font-semibold text-lg">
+                <h2 className="text-3xl font-bold text-red-900 dark:text-red-300 mb-6">Crucial Disclaimer</h2>
+                <div className="text-red-800 dark:text-red-300 space-y-4 leading-relaxed text-lg">
+                  <p className="font-bold text-xl">
                     This AI-generated assessment is for educational and informational purposes only.
                   </p>
                   <p>
@@ -838,14 +897,24 @@ Report ID: ${diagnosisData.interviewId}
                     conditions require proper evaluation by qualified healthcare providers.
                   </p>
                   <p>Always consult with a licensed physician, specialist, or healthcare provider for:</p>
-                  <ul className="list-disc pl-6 space-y-2">
-                    <li>Proper medical diagnosis and evaluation</li>
-                    <li>Treatment recommendations and medical advice</li>
-                    <li>Emergency medical situations</li>
-                    <li>Any health concerns or symptoms</li>
-                  </ul>
-                  <div className="bg-red-100 rounded-lg p-4 border border-red-300 mt-6">
-                    <p className="font-semibold">
+                  <div className="grid gap-3 mt-4">
+                    {[
+                      "Proper medical diagnosis and evaluation",
+                      "Treatment recommendations and medical advice",
+                      "Emergency medical situations",
+                      "Any health concerns or symptoms",
+                    ].map((item, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center p-3 bg-white dark:bg-red-900/10 rounded-xl border border-red-200 dark:border-red-700"
+                      >
+                        <div className="w-2 h-2 bg-red-500 rounded-full mr-4"></div>
+                        <span className="font-medium">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bg-red-100 dark:bg-red-900/40 rounded-2xl p-6 border border-red-300 dark:border-red-700 mt-6">
+                    <p className="font-bold text-xl">
                       <strong>Emergency Note:</strong> If you are experiencing a medical emergency, call emergency
                       services (911) immediately or visit your nearest emergency room.
                     </p>
@@ -859,14 +928,14 @@ Report ID: ${diagnosisData.interviewId}
           <div className="flex flex-col sm:flex-row gap-6 justify-center pt-8">
             <button
               onClick={downloadResults}
-              className="flex items-center justify-center px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors font-semibold text-lg shadow-lg hover:shadow-xl"
+              className="flex items-center justify-center px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-2xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105"
             >
               <Download className="h-6 w-6 mr-3" />
               Download Report
             </button>
             <button
               onClick={() => router.push("/chatbot")}
-              className="flex items-center justify-center px-8 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors font-semibold text-lg shadow-lg hover:shadow-xl"
+              className="flex items-center justify-center px-8 py-4 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-2xl hover:from-green-700 hover:to-blue-700 transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105"
             >
               <Activity className="h-6 w-6 mr-3" />
               New Assessment
