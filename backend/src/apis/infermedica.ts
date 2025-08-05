@@ -124,17 +124,24 @@ router.post('/diagnosis', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Sex, age, and evidence are required for diagnosis.' });
     }
 
+    // Filter out the 'name' field from evidence items for Infermedica API
+    const filteredEvidence = evidence.map((item: any) => ({
+      id: item.id,
+      choice_id: item.choice_id,
+      ...(item.source && { source: item.source }) // Only include source if it exists
+    }));
+
     // Prepare the payload for Infermedica
     const diagnosisPayload = {
       sex,
       age,
-      evidence,
+      evidence: filteredEvidence,
       ...(extras && { extras }),
       ...(evaluated_at && { evaluated_at })
     };
 
     console.log("Sending to Infermedica Diagnosis API:", diagnosisPayload);
-    console.log("Evidence items with source field:", JSON.stringify(evidence.map((e: any) => ({ id: e.id, choice_id: e.choice_id, source: e.source })), null, 2));
+    console.log("Filtered evidence items:", JSON.stringify(filteredEvidence.map((e: any) => ({ id: e.id, choice_id: e.choice_id, source: e.source })), null, 2));
 
     const response = await axios.post(`${INFERMEDICA_BASE_URL}/diagnosis`, 
       diagnosisPayload, 
@@ -183,61 +190,6 @@ router.get('/symptoms', async (req: Request, res: Response) => {
   }
 });
 
-// 5. Infermedica /Triage endpoint
-router.post('/triage', async (req: Request, res: Response) => {
-  try {
-    const { age, sex, symptoms, interviewId } = req.body;
-
-    console.log("Received Triage Request:", {
-      age,
-      sex,
-      symptomsCount: symptoms?.length || 0
-    });
-
-    if (!age || !sex || !symptoms) {
-      return res.status(400).json({ error: 'Age, sex, and symptoms are required for triage.' });
-    }
-
-    // Prepare the payload for Infermedica
-    const triagePayload = {
-      age,
-      sex,
-      symptoms,
-      extras: {
-          enable_explanations: true,
-          enable_evidence_details: true,
-          enable_conditions_details: true,
-          enable_triage_advanced_mode: true,
-          include_condition_ranking: true,
-          enable_symptom_duration: true,
-          enable_red_flags: true,
-          enable_prevalence: true,
-          enable_severity: true
-      }
-    };
-
-    console.log("Sending to Infermedica Triage API:", triagePayload);
-    
-    const response = await axios.post(`${INFERMEDICA_BASE_URL}/triage`, 
-      triagePayload,
-      {
-        headers: getInfermedicaHeaders(interviewId as string)
-      }
-    );
-
-    console.log("Infermedica Triage Response received");
-    console.log("Response Data:", response.data);
-
-    res.json(response.data);
-  } catch (error: any) {
-    console.error('Error proxying /triage:', error.message);
-    if (error.response) {
-      console.error('Infermedica Error Response:', error.response.data);
-      return res.status(error.response.status).json(error.response.data);
-    }
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
 
 // 6. Infermedica /explain endpoint
 router.post('/explain', async (req: Request, res: Response) => {
@@ -255,10 +207,17 @@ router.post('/explain', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Age, sex, evidence, and condition_id are required for explanation.' });
     }
 
+    // Filter out the 'name' field from evidence items for Infermedica API
+    const filteredEvidence = evidence.map((item: any) => ({
+      id: item.id,
+      choice_id: item.choice_id,
+      ...(item.source && { source: item.source }) // Only include source if it exists
+    }));
+
     const explainPayload = {
       sex,
       age,
-      evidence,
+      evidence: filteredEvidence,
       target: condition_id
     };
 
@@ -278,6 +237,200 @@ router.post('/explain', async (req: Request, res: Response) => {
     res.json(response.data);
   } catch (error: any) {
     console.error('Error proxying /explain:', error.message);
+    if (error.response) {
+      console.error('Infermedica Error Response:', error.response.data);
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// 7. Infermedica /triage endpoint
+router.post('/triage', async (req: Request, res: Response) => {
+  try {
+    const { age, sex, evidence, interviewId } = req.body;
+
+    console.log("Received Triage Request:", {
+      age,
+      sex,
+      evidenceCount: evidence?.length || 0
+    });
+
+    if (!age || !sex || !evidence) {
+      return res.status(400).json({ error: 'Age, sex, and evidence are required for triage.' });
+    }
+
+    // Filter out the 'name' field from evidence items for Infermedica API
+    const filteredEvidence = evidence.map((item: any) => ({
+      id: item.id,
+      choice_id: item.choice_id,
+      ...(item.source && { source: item.source })
+    }));
+
+    const triagePayload = {
+      age,
+      sex,
+      evidence: filteredEvidence,
+      extras: {
+          enable_explanations: true,
+          enable_evidence_details: true,
+          enable_conditions_details: true,
+          enable_triage_advanced_mode: true,
+          include_condition_ranking: true,
+          enable_symptom_duration: true,
+          enable_red_flags: true,
+          enable_prevalence: true,
+          enable_severity: true
+      }
+    };
+
+    console.log("Sending to Infermedica Triage API:", triagePayload);
+
+    const response = await axios.post(
+      `${INFERMEDICA_BASE_URL}/triage`,
+      triagePayload,
+      {
+        headers: getInfermedicaHeaders(interviewId as string)
+      }
+    );
+
+    console.log("Infermedica Triage Response received");
+    console.log("Response Data:", response.data);
+    res.json(response.data);
+  } catch (error: any) {
+    console.error('Error proxying /triage:', error.message);
+    if (error.response) {
+      console.error('Infermedica Error Response:', error.response.data);
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// 8. Infermedica /conditions/{id} endpoint - Get condition details
+router.get('/conditions/:id', async (req: Request, res: Response) => {
+  try {
+    const conditionId = req.params.id;
+    const { interviewId, age, sex } = req.query;
+
+    console.log("Received Condition Request:", { conditionId, age, sex });
+
+    if (!conditionId) {
+      return res.status(400).json({ error: 'Condition ID is required.' });
+    }
+
+    // Build query parameters - age and sex are required by Infermedica
+    const queryParams: any = {};
+    if (age) queryParams['age.value'] = age;
+    if (sex) queryParams['sex'] = sex;
+
+    const response = await axios.get(
+      `${INFERMEDICA_BASE_URL}/conditions/${conditionId}`,
+      {
+        headers: getInfermedicaHeaders(interviewId as string),
+        params: queryParams
+      }
+    );
+
+    console.log("Infermedica Condition Response received");
+    console.log("Response Data:", response.data);
+    res.json(response.data);
+  } catch (error: any) {
+    console.error('Error proxying /conditions:', error.message);
+    if (error.response) {
+      console.error('Infermedica Error Response:', error.response.data);
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// 9. Infermedica /conditions endpoint - List all conditions
+router.get('/conditions', async (req: Request, res: Response) => {
+  try {
+    const { interviewId, ...queryParams } = req.query;
+
+    console.log("Received Conditions List Request:", { queryParams });
+
+    const response = await axios.get(
+      `${INFERMEDICA_BASE_URL}/conditions`,
+      {
+        headers: getInfermedicaHeaders(interviewId as string),
+        params: queryParams
+      }
+    );
+
+    console.log("Infermedica Conditions List Response received");
+    console.log("Response Data:", response.data);
+    res.json(response.data);
+  } catch (error: any) {
+    console.error('Error proxying /conditions list:', error.message);
+    if (error.response) {
+      console.error('Infermedica Error Response:', error.response.data);
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// 10. Infermedica /risk_factors/{id} endpoint - Get risk factor details
+router.get('/risk_factors/:id', async (req: Request, res: Response) => {
+  try {
+    const riskFactorId = req.params.id;
+    const { interviewId, age, sex } = req.query;
+
+    console.log("Received Risk Factor Request:", { riskFactorId, age, sex });
+
+    if (!riskFactorId) {
+      return res.status(400).json({ error: 'Risk factor ID is required.' });
+    }
+
+    // Build query parameters - age and sex are required by Infermedica
+    const queryParams: any = {};
+    if (age) queryParams['age.value'] = age;
+    if (sex) queryParams['sex'] = sex;
+
+    const response = await axios.get(
+      `${INFERMEDICA_BASE_URL}/risk_factors/${riskFactorId}`,
+      {
+        headers: getInfermedicaHeaders(interviewId as string),
+        params: queryParams
+      }
+    );
+
+    console.log("Infermedica Risk Factor Response received");
+    console.log("Response Data:", response.data);
+    res.json(response.data);
+  } catch (error: any) {
+    console.error('Error proxying /risk_factors:', error.message);
+    if (error.response) {
+      console.error('Infermedica Error Response:', error.response.data);
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// 11. Infermedica /risk_factors endpoint - List all risk factors
+router.get('/risk_factors', async (req: Request, res: Response) => {
+  try {
+    const { interviewId, ...queryParams } = req.query;
+
+    console.log("Received Risk Factors List Request:", { queryParams });
+
+    const response = await axios.get(
+      `${INFERMEDICA_BASE_URL}/risk_factors`,
+      {
+        headers: getInfermedicaHeaders(interviewId as string),
+        params: queryParams
+      }
+    );
+
+    console.log("Infermedica Risk Factors List Response received");
+    console.log("Response Data:", response.data);
+    res.json(response.data);
+  } catch (error: any) {
+    console.error('Error proxying /risk_factors list:', error.message);
     if (error.response) {
       console.error('Infermedica Error Response:', error.response.data);
       return res.status(error.response.status).json(error.response.data);

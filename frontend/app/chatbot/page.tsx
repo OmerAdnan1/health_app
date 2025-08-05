@@ -21,19 +21,18 @@ import {
 } from "lucide-react"
 import { v4 as uuidv4 } from "uuid"
 import {
-  getDiagnosis,
-  getParseResult,
-  askGemini,
-  getGeographicRiskFactors,
-  smartStopLogic,
-  normalizeText,
   type EvidenceItem,
   type Condition,
   type InfermedicaQuestion,
   type InfermedicaChoice,
   type InfermedicaQuestionItem,
   type InitialQuestion,
+  type DiagnosisData,
+  getGeographicRiskFactors,
+  smartStopLogic,
+  normalizeText,
 } from "../../lib/api/healthAPI"
+import { useHealthWorkflow } from "../../lib/hooks/useHealthAPI"
 
 // Type Definitions
 type Message = {
@@ -69,8 +68,12 @@ type Message = {
 
 export default function ChatbotPage() {
   const router = useRouter()
+  
+  // 🎣 Using the combined health workflow hook
+  const { parseSymptoms, diagnose, askAI, isLoading: apiLoading, error: apiError } = useHealthWorkflow()
+  
   const [userAge, setUserAge] = useState<number | null>(null)
-  const [userSex, setUserSex] = useState<"male" | "female" | "other" | null>(null)
+  const [userSex, setUserSex] = useState<"male" | "female" | null>(null)
   const [userLocation, setUserLocation] = useState<string | null>(null)
 
   const [messages, setMessages] = useState<Message[]>([])
@@ -113,10 +116,9 @@ export default function ChatbotPage() {
       id: "sex_input",
       question: "What is your gender?",
       type: "select",
-      options: ["male", "female", "other"],
+      options: ["male", "female"],
       tips: [
         "This helps provide gender-specific health insights",
-        "If you prefer not to specify, select 'other'",
         "Your privacy is our top priority",
       ],
     },
@@ -322,11 +324,18 @@ export default function ChatbotPage() {
     setIsTyping(true)
     addUserMessage("Confirmed selections.")
 
-    const newEvidenceToAdd: EvidenceItem[] = Object.entries(tempGroupedSelections).map(([id, choice_id]) => ({
-      id,
-      choice_id: choice_id as "present" | "absent" | "unknown",
-      // No source attribute for evidence gathered during dynamic interview per Infermedica docs
-    }))
+    const newEvidenceToAdd: EvidenceItem[] = Object.entries(tempGroupedSelections).map(([id, choice_id]) => {
+      // Find the symptom name from the current question items
+      const symptomItem = currDiagnosisQuestions?.items.find(item => item.id === id)
+      const symptomName = symptomItem?.name || "Unknown symptom"
+      
+      return {
+        id,
+        choice_id: choice_id as "present" | "absent" | "unknown",
+        name: symptomName,
+        // No source attribute for evidence gathered during dynamic interview per Infermedica docs
+      }
+    })
 
     console.log(`Adding ${newEvidenceToAdd.length} dynamic interview evidence items from questions:`, newEvidenceToAdd)
 
@@ -341,7 +350,8 @@ export default function ChatbotPage() {
 
     setTimeout(async () => {
       try {
-        const nextDiagnosisResult = await getDiagnosis(combinedEvidence, userAge, userSex, interviewId)
+        // 🎣 Using hook instead of direct API call
+        const nextDiagnosisResult = await diagnose(combinedEvidence, userAge, userSex, interviewId)
         setDiagnosisResult(JSON.stringify(nextDiagnosisResult, null, 2))
         setCurrDiagnosisConditions(nextDiagnosisResult.conditions || [])
         setCurrDiagnosisQuestions(nextDiagnosisResult.question || null)
@@ -388,7 +398,8 @@ export default function ChatbotPage() {
         }
       } catch (error) {
         console.error("Error during grouped_multiple diagnosis confirmation:", error)
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred."
+        // 🎣 Show API errors from hook if available
+        const errorMessage = apiError || (error instanceof Error ? error.message : "An unknown error occurred.")
         addBotMessage(`An error occurred: ${errorMessage}. Please try again.`)
         setIsTyping(false)
       }
@@ -401,7 +412,8 @@ export default function ChatbotPage() {
 
     setTimeout(async () => {
       try {
-        const nextDiagnosisResult = await getDiagnosis(currentEvidence, userAge, userSex, interviewId)
+        // 🎣 Using hook instead of direct API call
+        const nextDiagnosisResult = await diagnose(currentEvidence, userAge, userSex, interviewId)
         setDiagnosisResult(JSON.stringify(nextDiagnosisResult, null, 2))
         setCurrDiagnosisConditions(nextDiagnosisResult.conditions || [])
         setCurrDiagnosisQuestions(nextDiagnosisResult.question || null)
@@ -448,7 +460,8 @@ export default function ChatbotPage() {
         }
       } catch (error) {
         console.error("Error during diagnosis:", error)
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred."
+        // 🎣 Show API errors from hook if available
+        const errorMessage = apiError || (error instanceof Error ? error.message : "An unknown error occurred.")
         addBotMessage(`An error occurred: ${errorMessage}. Please try again.`)
         setIsTyping(false)
       }
@@ -482,7 +495,8 @@ export default function ChatbotPage() {
         const questionType = currDiagnosisQuestions.type
 
         if (questionType === "single" || questionType === "group_single") {
-          const newEvidence = [...evidence.filter((item) => item.id !== itemId), { id: itemId, choice_id: choiceId }]
+          const symptomName = chosenItem?.name || "Unknown symptom"
+          const newEvidence = [...evidence.filter((item) => item.id !== itemId), { id: itemId, choice_id: choiceId, name: symptomName }]
           setEvidence(newEvidence)
           await proceedWithDiagnosis(newEvidence)
         } else if (questionType === "group_multiple") {
@@ -516,11 +530,11 @@ export default function ChatbotPage() {
         return
       } else if (currentFixedQuestion.id === "sex_input") {
         const sex = value.toLowerCase()
-        if (!["male", "female", "other"].includes(sex)) {
-          addBotMessage("Please select from 'male', 'female', or 'other'.")
+        if (!["male", "female"].includes(sex)) {
+          addBotMessage("Please select from 'male' or 'female'.")
           return
         }
-        setUserSex(sex as "male" | "female" | "other")
+        setUserSex(sex as "male" | "female")
         if (!interviewId) {
           setInterviewId(uuidv4())
         }
@@ -549,7 +563,9 @@ export default function ChatbotPage() {
           const normalizedInput = normalizeText(value)
           console.log("Normalized Input:", normalizedInput)
           console.log("Using UserAge:", userAge)
-          const result = await getParseResult(normalizedInput, userAge, userSex, interviewId)
+          
+          // 🎣 Using hook instead of direct API call
+          const result = await parseSymptoms(normalizedInput, userAge, userSex, interviewId)
           if (!result || !Array.isArray(result.mentions)) {
             throw new Error("Received an invalid response format for symptom analysis. Please try again.")
           }
@@ -557,6 +573,7 @@ export default function ChatbotPage() {
           const initialEvidence: EvidenceItem[] = result.mentions.map((mention: any) => ({
             id: mention.id,
             choice_id: mention.choice_id,
+            name: mention.name || mention.common_name || "Unknown symptom",
             source: "initial",
           }))
 
@@ -576,7 +593,8 @@ export default function ChatbotPage() {
           }
 
           setEvidence(allInitialEvidence)
-          const diagnosis = await getDiagnosis(allInitialEvidence, userAge, userSex, interviewId)
+          // 🎣 Using hook instead of direct API call
+          const diagnosis = await diagnose(allInitialEvidence, userAge, userSex, interviewId)
 
           if (!diagnosis) {
             throw new Error("No diagnosis data received from the API.")
@@ -608,7 +626,8 @@ export default function ChatbotPage() {
           }
         } catch (error) {
           console.error("Error during initial diagnosis process:", error)
-          const errorMessage = error instanceof Error ? error.message : "An unknown error occurred."
+          // 🎣 Show API errors from hook if available
+          const errorMessage = apiError || (error instanceof Error ? error.message : "An unknown error occurred.")
           addBotMessage(`An error occurred: ${errorMessage}. Please try again.`)
           setIsTyping(false)
         }
@@ -976,13 +995,14 @@ export default function ChatbotPage() {
 
   const displayFinalDiagnosis = async (conditions: Condition[]) => {
     // Store diagnosis data for results page
-    const diagnosisData = {
+    const diagnosisData: DiagnosisData = {
       conditions: conditions || [],
       emergencySymptoms: emergencySymptoms,
       userAge,
       userSex,
       userLocation,
       evidence,
+      interviewId, // Add interview ID to maintain session consistency
       timestamp: new Date().toISOString(),
       questionCount: diagnosisQuestionCount,
     }

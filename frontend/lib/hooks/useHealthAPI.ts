@@ -1,14 +1,10 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import {
-  getDiagnosis,
-  getParseResult,
-  askGemini,
-  getGeographicRiskFactors,
-  type EvidenceItem,
-  type DiagnosisResponse,
-} from "../api/healthAPI"
+import { getParseResult, getDiagnosis, askGemini, getGeographicRiskFactors, ExplainRequest, EvidenceItem, getExplainationRes, DiagnosisResponse  } from "../api/healthAPI"
+import { v4 as uuidv4 } from "uuid"
+
+
 
 // Hook for symptom parsing
 export const useSymptomParser = () => {
@@ -19,7 +15,7 @@ export const useSymptomParser = () => {
     async (
       symptoms: string,
       userAge: number | null,
-      userSex: "male" | "female" | "other" | null,
+      userSex: "male" | "female" | null,
       interviewId: string | null,
     ) => {
       setIsLoading(true)
@@ -51,7 +47,7 @@ export const useDiagnosis = () => {
     async (
       evidence: EvidenceItem[],
       userAge: number | null,
-      userSex: "male" | "female" | "other" | null,
+      userSex: "male" | "female" | null,
       interviewId: string | null,
     ): Promise<DiagnosisResponse> => {
       setIsLoading(true)
@@ -116,3 +112,31 @@ export const useHealthWorkflow = () => {
     error,
   }
 }
+
+
+export const useExplanation = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const getExplanation = useCallback(async (explainData: ExplainRequest) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const result = await getExplainationRes(explainData);
+      return result;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to get explanation';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return {
+    getExplanation,
+    isLoading,
+    error
+  };
+};

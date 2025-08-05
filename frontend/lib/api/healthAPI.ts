@@ -5,6 +5,7 @@ export type EvidenceItem = {
   id: string
   choice_id: "present" | "absent" | "unknown"
   source?: "initial" | "suggest" | "predefined" | "red_flags"
+  name: string
 }
 
 export type Condition = {
@@ -56,6 +57,63 @@ export type InitialQuestion = {
   tips: string[]
 }
 
+// Type for diagnosis data stored in localStorage
+export type DiagnosisData = {
+  conditions: Condition[]
+  emergencySymptoms: string[]
+  userAge: number | null
+  userSex: "male" | "female" | null
+  userLocation: string | null
+  evidence: EvidenceItem[]
+  interviewId: string | null
+  timestamp: string
+  questionCount: number
+}
+
+// Type for triage response
+export type TriageResponse = {
+  triage_level: "non_urgent" | "self_care" | "consultation" | "consultation_24" | "emergency"
+  description: string
+  label: string
+  serious: Array<{
+    id: string
+    name: string
+    common_name: string
+    is_emergency?: boolean
+  }>
+}
+
+// Type for condition details
+export type ConditionDetails = {
+  id: string
+  name: string
+  common_name: string
+  sex_filter: "both" | "male" | "female"
+  prevalence: "very_rare" | "rare" | "moderate" | "common" | "very_common"
+  acuteness: "chronic" | "chronic_with_exacerbation" | "acute_potentially_chronic" | "acute"
+  severity: "mild" | "moderate" | "severe"
+  extras?: {
+    hint?: string
+    icd10_code?: string
+  }
+  image_url?: string
+  image_source?: string
+}
+
+// Type for risk factor details
+export type RiskFactorDetails = {
+  id: string
+  name: string
+  common_name?: string
+  sex_filter: "both" | "male" | "female"
+  category: string
+  extras?: {
+    hint?: string
+  }
+  image_url?: string
+  image_source?: string
+}
+
 // Helper function to safely parse API responses
 export const parseJsonResponse = async (response: Response) => {
   try {
@@ -88,26 +146,26 @@ export const getGeographicRiskFactors = (location: string | null): EvidenceItem[
 
   switch (location) {
     case "United States/Canada":
-      riskFactors.push({ id: "p_13", choice_id: "present", source: "predefined" })
+      riskFactors.push({ id: "p_13", choice_id: "present", source: "predefined", name: "Living in North America" })
       break
     case "Europe":
-      riskFactors.push({ id: "p_15", choice_id: "present", source: "predefined" })
+      riskFactors.push({ id: "p_15", choice_id: "present", source: "predefined", name: "Living in Europe" })
       break
     case "Asia":
-      riskFactors.push({ id: "p_236", choice_id: "present", source: "predefined" })
+      riskFactors.push({ id: "p_236", choice_id: "present", source: "predefined", name: "Living in Asia" })
       break
     case "Africa":
       // Using Central Africa as default, could be refined further
-      riskFactors.push({ id: "p_17", choice_id: "present", source: "predefined" })
+      riskFactors.push({ id: "p_17", choice_id: "present", source: "predefined", name: "Living in Central Africa" })
       break
     case "South America":
-      riskFactors.push({ id: "p_14", choice_id: "present", source: "predefined" })
+      riskFactors.push({ id: "p_14", choice_id: "present", source: "predefined", name: "Living in South America" })
       break
     case "Australia/Oceania":
-      riskFactors.push({ id: "p_19", choice_id: "present", source: "predefined" })
+      riskFactors.push({ id: "p_19", choice_id: "present", source: "predefined", name: "Living in Australia/Oceania" })
       break
     case "Middle East":
-      riskFactors.push({ id: "p_21", choice_id: "present", source: "predefined" })
+      riskFactors.push({ id: "p_21", choice_id: "present", source: "predefined", name: "Living in Middle East" })
       break
   }
 
@@ -277,7 +335,7 @@ export const smartStopLogic = (
 export const getDiagnosis = async (
   currentEvidence: EvidenceItem[],
   userAge: number | null,
-  userSex: "male" | "female" | "other" | null,
+  userSex: "male" | "female" | null,
   interviewId: string | null,
 ): Promise<DiagnosisResponse> => {
   if (userAge === null || userSex === null || currentEvidence.length === 0) {
@@ -342,7 +400,7 @@ export const getDiagnosis = async (
 export const getParseResult = async (
   responseString: string,
   userAge: number | null,
-  userSex: "male" | "female" | "other" | null,
+  userSex: "male" | "female" | null,
   interviewId: string | null,
 ) => {
   if (userAge === null || userSex === null) {
@@ -377,13 +435,13 @@ export const getParseResult = async (
 
     const data = await parseJsonResponse(res)
 
-    // Filter out low-relevance mentions to improve quality
-    if (data.mentions) {
-      data.mentions = data.mentions.filter((m: any) => {
-        // Keep mentions with higher relevance or confidence
-        return m.relevance ? m.relevance > 0.4 : true
-      })
-    }
+    // // Filter out low-relevance mentions to improve quality
+    // if (data.mentions) {
+    //   data.mentions = data.mentions.filter((m: any) => {
+    //     // Keep mentions with higher relevance or confidence
+    //     return m.relevance ? m.relevance > 0.4 : true
+    //   })
+    // }
 
     return data
   } catch (error) {
@@ -404,6 +462,241 @@ export const askGemini = async (prompt: string): Promise<string> => {
     return data.candidates?.[0]?.content?.parts?.[0]?.text || "No response"
   } catch (error) {
     console.error("Gemini API call failed:", error)
+    throw error
+  }
+}
+
+// Interface for explain API end point
+export interface ExplainRequest {
+  age: {value: number, unit: string}
+  sex: {value: 'male' | 'female' }
+  evidence: Array<EvidenceItem>
+  target_condition: string
+  interviewId: string
+}
+
+// API function for explain endpoint
+export const getExplainationRes = async (request: ExplainRequest): Promise<any> => {
+  if (!request.age || !request.sex || !request.evidence || !request.target_condition) {
+    throw new Error("Explain api missing required fields.")
+  }
+
+  const payload = {
+    age: request.age,
+    sex: request.sex.value, // Extract just the value, not the object
+    evidence: request.evidence,
+    condition_id: request.target_condition,
+    interviewId: request.interviewId || uuidv4(), // Ensure interviewId is always set
+  }
+
+  console.log("📤 Sending explanation request:", payload)
+
+  try {
+    const res = await fetch("http://localhost:5001/api/infermedica/explain", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Interview-Id": request.interviewId,
+      },
+      body: JSON.stringify(payload),
+    })
+    const result = await parseJsonResponse(res)
+    console.log("📥 Received explanation response:", result)
+    return result
+  } catch (error) {
+    console.error("Explain API call failed:", error)
+    throw error
+  }
+}
+
+// API function for triage endpoint
+export const getTriageResult = async (
+  age: {value: number, unit: string},
+  sex: {value: 'male' | 'female'},
+  evidence: Array<EvidenceItem>,
+  interviewId: string
+): Promise<any> => {
+  if (!age || !sex || !evidence) {
+    throw new Error("Triage API missing required fields.")
+  }
+
+  const payload = {
+    age,
+    sex: sex.value,
+    evidence,
+    interviewId: interviewId || uuidv4(),
+  }
+
+  console.log("📤 Sending triage request:", payload)
+
+  try {
+    const res = await fetch("http://localhost:5001/api/infermedica/triage", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Interview-Id": interviewId,
+      },
+      body: JSON.stringify(payload),
+    })
+    const result = await parseJsonResponse(res)
+    console.log("📥 Received triage response:", result)
+    return result
+  } catch (error) {
+    console.error("Triage API call failed:", error)
+    throw error
+  }
+}
+
+// API function to get condition details by ID
+export const getConditionDetails = async (
+  conditionId: string,
+  interviewId?: string,
+  age?: number,
+  sex?: string
+): Promise<any> => {
+  if (!conditionId) {
+    throw new Error("Condition ID is required.")
+  }
+
+  console.log("📤 Fetching condition details for:", conditionId, { age, sex })
+
+  try {
+    const url = new URL(`http://localhost:5001/api/infermedica/conditions/${conditionId}`)
+    if (interviewId) {
+      url.searchParams.append('interviewId', interviewId)
+    }
+    if (age) {
+      url.searchParams.append('age', age.toString())
+    }
+    if (sex) {
+      url.searchParams.append('sex', sex)
+    }
+
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(interviewId && { "Interview-Id": interviewId }),
+      },
+    })
+    const result = await parseJsonResponse(res)
+    console.log("📥 Received condition details:", result)
+    return result
+  } catch (error) {
+    console.error("Condition details API call failed:", error)
+    throw error
+  }
+}
+
+// API function to list all conditions
+export const getConditionsList = async (
+  queryParams?: Record<string, string>,
+  interviewId?: string
+): Promise<any> => {
+  console.log("📤 Fetching conditions list")
+
+  try {
+    const url = new URL("http://localhost:5001/api/infermedica/conditions")
+    
+    // Add query parameters
+    if (queryParams) {
+      Object.entries(queryParams).forEach(([key, value]) => {
+        url.searchParams.append(key, value)
+      })
+    }
+    if (interviewId) {
+      url.searchParams.append('interviewId', interviewId)
+    }
+
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(interviewId && { "Interview-Id": interviewId }),
+      },
+    })
+    const result = await parseJsonResponse(res)
+    console.log("📥 Received conditions list:", result)
+    return result
+  } catch (error) {
+    console.error("Conditions list API call failed:", error)
+    throw error
+  }
+}
+
+// API function to get risk factor details by ID
+export const getRiskFactorDetails = async (
+  riskFactorId: string,
+  age?: number,
+  sex?: string,
+  interviewId?: string
+): Promise<any> => {
+  if (!riskFactorId) {
+    throw new Error("Risk factor ID is required.")
+  }
+
+  console.log("📤 Fetching risk factor details for:", riskFactorId)
+
+  try {
+    const url = new URL(`http://localhost:5001/api/infermedica/risk_factors/${riskFactorId}`)
+    if (interviewId) {
+      url.searchParams.append('interviewId', interviewId)
+    }
+    if (age) {
+      url.searchParams.append('age', age.toString())
+    }
+    if (sex) {
+      url.searchParams.append('sex', sex)
+    }
+
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(interviewId && { "Interview-Id": interviewId }),
+      },
+    })
+    const result = await parseJsonResponse(res)
+    console.log("📥 Received risk factor details:", result)
+    return result
+  } catch (error) {
+    console.error("Risk factor details API call failed:", error)
+    throw error
+  }
+}
+
+// API function to list all risk factors
+export const getRiskFactorsList = async (
+  queryParams?: Record<string, string>,
+  interviewId?: string
+): Promise<any> => {
+  console.log("📤 Fetching risk factors list")
+
+  try {
+    const url = new URL("http://localhost:5001/api/infermedica/risk_factors")
+    
+    // Add query parameters
+    if (queryParams) {
+      Object.entries(queryParams).forEach(([key, value]) => {
+        url.searchParams.append(key, value)
+      })
+    }
+    if (interviewId) {
+      url.searchParams.append('interviewId', interviewId)
+    }
+
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(interviewId && { "Interview-Id": interviewId }),
+      },
+    })
+    const result = await parseJsonResponse(res)
+    console.log("📥 Received risk factors list:", result)
+    return result
+  } catch (error) {
+    console.error("Risk factors list API call failed:", error)
     throw error
   }
 }
